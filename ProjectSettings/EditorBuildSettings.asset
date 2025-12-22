@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/Intro.unity
+    guid: fa863f255367d954cac98b85effb3a7d
+  - enabled: 0
+    path: Assets/Scenes/Menu.unity
+    guid: a38dbcbf40ac7724fae95762b9b479e5
+  - enabled: 1
+    path: Assets/Scenes/Map.unity
+    guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 1
+    path: Assets/Scenes/Map 1 Museum/Museum Gate.unity
+    guid: ffcf2923d987d6146bee90d111b8c34d
+  - enabled: 1
+    path: Assets/Scenes/Map 1 Museum/Museum 1.unity
+    guid: a9fcd668a818fc74fa2c6b6ab574b627
+  - enabled: 1
+    path: Assets/Scenes/Map 2 Wells/wells Gate.unity
+    guid: da7f62e5a0e1f744d8c895cfc34f6a4b
+  - enabled: 1
+    path: Assets/Scenes/Map 2 Wells/wells.unity
+    guid: 89bc7e8382bd6054cb84d1db7863c744
+  - enabled: 1
+    path: Assets/Scenes/Map 3 gemstones/gemstones Gate.unity
+    guid: bc460327a7299b64b90b871867945a0a
+  - enabled: 1
+    path: Assets/Scenes/Map 3 gemstones/gemstones.unity
+    guid: 84f0d56c8669ef74b80705cbfc30cdbd
+  - enabled: 1
+    path: Assets/Scenes/Map 4 Cinema/cinema Gate.unity
+    guid: ddb6735d04c2fd541819b24b186c4f66
+  - enabled: 1
+    path: Assets/Scenes/Map 4 Cinema/cinema.unity
+    guid: 1500ac2f9360c2b41913236b91d19c26
+  m_configObjects: {}
+  m_UseUCBPForAssetBundles: 0

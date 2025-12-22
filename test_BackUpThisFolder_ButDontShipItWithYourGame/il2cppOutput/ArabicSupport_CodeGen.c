@@ -1,0 +1,78 @@
+﻿#include "pch-c.h"
+
+
+#include "codegen/il2cpp-codegen-metadata.h"
+
+
+
+
+
+extern void ArabicFixer_Fix_m9730E690C677B5EBE39374C9E3E6B24AFCF8EAF7 (void);
+extern void ArabicMapping__ctor_m6A32CA86176A66361A14C67BF0CD2D50DA99817F (void);
+extern void ArabicTable__ctor_m76724DAB9BED263157507C4397B8C878782AA4F7 (void);
+extern void ArabicTable_get_ArabicMapper_m8501FCFA453AD5108356FD8840BB9DAA5F18BB9B (void);
+extern void ArabicTable_Convert_m5D0DF46F544B79DCEC22D2EBCBFB85F1FBBF275E (void);
+extern void TashkeelLocation__ctor_mBE2CD47226E1AD36CE09706B69E2E0CB8E3B6C77 (void);
+extern void ArabicFixerTool_RemoveTashkeel_m3A1A3B4D44139E1B29BA133AF4F18FF578677546 (void);
+extern void ArabicFixerTool_ReturnTashkeel_mE5AA0827F75B228FE8AC95BEDD0A325DED08F3B2 (void);
+extern void ArabicFixerTool_FixLine_m498CD54DE79AF395C056F539573B77588E682961 (void);
+extern void ArabicFixerTool_IsIgnoredCharacter_m0D03031FE3BB20AD074EF5804A115C3EB603D217 (void);
+extern void ArabicFixerTool_IsLeadingLetter_m79CE552A708ED5520292F8533039826171937204 (void);
+extern void ArabicFixerTool_IsFinishingLetter_m452121591BB959366AB7AB0151D7CD32C25B127E (void);
+extern void ArabicFixerTool_IsMiddleLetter_m4E5EDBDD129C25E97120F3E3A7BCC5FAD124CEB7 (void);
+extern void ArabicFixerTool__cctor_m86C1BCE8477B512DA013E1725CBDD8D9CE506B54 (void);
+static Il2CppMethodPointer s_methodPointers[14] = 
+{
+	ArabicFixer_Fix_m9730E690C677B5EBE39374C9E3E6B24AFCF8EAF7,
+	ArabicMapping__ctor_m6A32CA86176A66361A14C67BF0CD2D50DA99817F,
+	ArabicTable__ctor_m76724DAB9BED263157507C4397B8C878782AA4F7,
+	ArabicTable_get_ArabicMapper_m8501FCFA453AD5108356FD8840BB9DAA5F18BB9B,
+	ArabicTable_Convert_m5D0DF46F544B79DCEC22D2EBCBFB85F1FBBF275E,
+	TashkeelLocation__ctor_mBE2CD47226E1AD36CE09706B69E2E0CB8E3B6C77,
+	ArabicFixerTool_RemoveTashkeel_m3A1A3B4D44139E1B29BA133AF4F18FF578677546,
+	ArabicFixerTool_ReturnTashkeel_mE5AA0827F75B228FE8AC95BEDD0A325DED08F3B2,
+	ArabicFixerTool_FixLine_m498CD54DE79AF395C056F539573B77588E682961,
+	ArabicFixerTool_IsIgnoredCharacter_m0D03031FE3BB20AD074EF5804A115C3EB603D217,
+	ArabicFixerTool_IsLeadingLetter_m79CE552A708ED5520292F8533039826171937204,
+	ArabicFixerTool_IsFinishingLetter_m452121591BB959366AB7AB0151D7CD32C25B127E,
+	ArabicFixerTool_IsMiddleLetter_m4E5EDBDD129C25E97120F3E3A7BCC5FAD124CEB7,
+	ArabicFixerTool__cctor_m86C1BCE8477B512DA013E1725CBDD8D9CE506B54,
+};
+static const int32_t s_InvokerIndices[14] = 
+{
+	9284,
+	2834,
+	7837,
+	11146,
+	4911,
+	3242,
+	9944,
+	9953,
+	10705,
+	10496,
+	9681,
+	9681,
+	9681,
+	11210,
+};
+IL2CPP_EXTERN_C const Il2CppCodeGenModule g_ArabicSupport_CodeGenModule;
+const Il2CppCodeGenModule g_ArabicSupport_CodeGenModule = 
+{
+	"ArabicSupport.dll",
+	14,
+	s_methodPointers,
+	0,
+	NULL,
+	s_InvokerIndices,
+	0,
+	NULL,
+	0,
+	NULL,
+	0,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
