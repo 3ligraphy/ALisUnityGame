@@ -4,8 +4,6 @@
 <dict>
     <key>method</key>
     <string>app-store</string>
-    <key>teamID</key>
-    <string>YOUR_TEAM_ID</string>
     <key>uploadBitcode</key>
     <false/>
     <key>uploadSymbols</key>
@@ -14,13 +12,8 @@
     <false/>
     <key>signingStyle</key>
     <string>automatic</string>
-    <key>signingCertificate</key>
-    <string>Apple Distribution</string>
-    <key>provisioningProfiles</key>
-    <dict>
-        <key>YOUR_BUNDLE_ID</key>
-        <string>YOUR_PROVISIONING_PROFILE_NAME</string>
-    </dict>
+    <!-- CodeMagic will automatically handle team ID, certificates, and provisioning profiles -->
+    <!-- based on your Apple Developer integration settings -->
 </dict>
 </plist>
 
