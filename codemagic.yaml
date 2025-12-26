@@ -219,6 +219,26 @@ workflows:
             echo "⚠️  Build log not found, but continuing..."
           fi
           
+      - name: Verify Code Signing Setup
+        script: |
+          echo "=========================================="
+          echo "Verifying Apple Developer Integration..."
+          echo "=========================================="
+          
+          # Check if code signing certificates are available
+          echo "Checking for signing certificates..."
+          security find-identity -v -p codesigning || echo "No signing certificates found"
+          
+          # Check if provisioning profiles are available
+          echo "Checking for provisioning profiles..."
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No provisioning profiles found"
+          
+          # List available certificates
+          echo "Available certificates:"
+          security find-identity -p codesigning -v | grep "Apple" || echo "⚠️ No Apple certificates found"
+          
+          echo "✅ Code signing verification complete"
+      
       - name: Configure Xcode Project
         script: |
           echo "=========================================="
@@ -311,13 +331,16 @@ workflows:
             WORKSPACE="Unity-iPhone.xcworkspace"
             SCHEME="Unity-iPhone"
             
-            # CodeMagic will handle code signing automatically during export
-            # We build without signing here, signing happens during IPA export
+            # Build with automatic code signing using Apple Developer integration
+            echo "Building with automatic code signing..."
             xcodebuild \
               -workspace "$WORKSPACE" \
               -scheme "$SCHEME" \
               -configuration Release \
               -archivePath "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" \
+              -allowProvisioningUpdates \
+              CODE_SIGN_STYLE=Automatic \
+              DEVELOPMENT_TEAM="" \
               archive \
               -quiet
               
@@ -326,12 +349,16 @@ workflows:
             PROJECT="Unity-iPhone.xcodeproj"
             SCHEME="Unity-iPhone"
             
-            # CodeMagic will handle code signing automatically during export
+            # Build with automatic code signing using Apple Developer integration
+            echo "Building with automatic code signing..."
             xcodebuild \
               -project "$PROJECT" \
               -scheme "$SCHEME" \
               -configuration Release \
               -archivePath "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" \
+              -allowProvisioningUpdates \
+              CODE_SIGN_STYLE=Automatic \
+              DEVELOPMENT_TEAM="" \
               archive \
               -quiet
           else
