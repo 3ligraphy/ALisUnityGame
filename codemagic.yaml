@@ -1,0 +1,354 @@
+# CodeMagic Configuration for Unity iOS Build
+# This configuration is optimized for Unity Personal (Free) license with Gmail login
+# 
+# ⚠️ SECURITY WARNING: This file contains your Unity credentials directly in the YAML file.
+# This means your password will be visible in your Git repository!
+# 
+# RECOMMENDED: Use environment variables instead (more secure):
+# 1. Go to CodeMagic dashboard > Your App > Settings > Environment variables
+# 2. Add UNITY_EMAIL and UNITY_PASSWORD as secure environment variables
+# 3. Remove the values below and use ${UNITY_EMAIL} and ${UNITY_PASSWORD} instead
+#
+# If you must use direct values, consider:
+# - Adding codemagic.yaml to .gitignore (but then you can't version control it)
+# - Using a private repository
+# - Changing your Unity password after sharing this file
+#
+# TO USE THIS FILE: Replace the placeholder values below with your actual credentials
+
+workflows:
+  ios-workflow:
+    name: iOS Workflow
+    max_build_duration: 120
+    instance_type: mac_mini_m1
+    environment:
+      groups:
+        # Add your CodeMagic API token group here (optional, for App Store Connect automation)
+        # - app_store_credentials
+      vars:
+        # Unity version - matches your project version
+        UNITY_VERSION: "6000.2.15f1"
+        
+        # Unity Personal License - NO SERIAL NUMBER NEEDED!
+        # For Personal license, leave UNITY_SERIAL empty or don't set it
+        # Only Plus/Pro licenses need a serial number
+        # UNITY_SERIAL: ""  # Leave empty for Personal license
+        
+        # Unity account credentials - REPLACE WITH YOUR ACTUAL VALUES
+        # ⚠️ WARNING: These will be visible in your Git repository!
+        UNITY_EMAIL: "amohamad343@gmail.com"  # ⚠️ REPLACE with your Gmail address
+        UNITY_PASSWORD: "AJ1422003249aj*"      # ⚠️ REPLACE with your Unity password
+        
+        # Bundle identifier - already configured for your app
+        BUNDLE_ID: "com.failaka.games.adventure"
+        
+        # App Store Connect App ID (optional - for automatic TestFlight uploads)
+        # APP_STORE_ID: ""  # Add this later if you want automatic uploads
+        
+      xcode: latest
+      cocoapods: default
+      
+    scripts:
+      - name: Verify Unity Installation
+        script: |
+          echo "Checking Unity installation..."
+          echo "Unity Version: ${UNITY_VERSION}"
+          
+          # CodeMagic will install Unity automatically, but let's verify
+          if [ -d "/Applications/Unity/Hub/Editor/${UNITY_VERSION}" ]; then
+            echo "Unity ${UNITY_VERSION} found in default location"
+          else
+            echo "Unity will be installed by CodeMagic during build"
+          fi
+          
+      - name: Build Unity Project for iOS
+        script: |
+          echo "=========================================="
+          echo "Building Unity project for iOS..."
+          echo "Using Unity Personal License (Free)"
+          echo "=========================================="
+          
+          set -e
+          
+          # Find Unity executable
+          # CodeMagic installs Unity, so we check common locations
+          UNITY_PATH=""
+          
+          # Check Unity Hub location first
+          if [ -f "/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity" ]; then
+            UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
+          # Check for direct Unity installation
+          elif [ -f "/Applications/Unity/Unity.app/Contents/MacOS/Unity" ]; then
+            UNITY_PATH="/Applications/Unity/Unity.app/Contents/MacOS/Unity"
+          # Try to find Unity anywhere
+          else
+            UNITY_PATH=$(find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+            if [ -z "$UNITY_PATH" ]; then
+              echo "Error: Unity not found. CodeMagic should install it automatically."
+              echo "Trying default path..."
+              UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
+            fi
+          fi
+          
+          echo "Using Unity at: $UNITY_PATH"
+          
+          # Verify Unity exists
+          if [ ! -f "$UNITY_PATH" ]; then
+            echo "Error: Unity executable not found at $UNITY_PATH"
+            exit 1
+          fi
+          
+          # Build Unity project for iOS
+          # For Personal license, we don't use -serial parameter
+          echo "Starting Unity build (this may take 10-20 minutes)..."
+          
+          $UNITY_PATH \
+            -quit \
+            -batchmode \
+            -nographics \
+            -projectPath "$CM_BUILD_DIR" \
+            -buildTarget iOS \
+            -buildPath "$CM_BUILD_DIR/build/ios" \
+            -username "${UNITY_EMAIL}" \
+            -password "${UNITY_PASSWORD}" \
+            -logFile "$CM_BUILD_DIR/unity_build.log" \
+            || true
+          
+          # Check build result
+          echo "=========================================="
+          echo "Checking build log..."
+          echo "=========================================="
+          
+          if [ -f "$CM_BUILD_DIR/unity_build.log" ]; then
+            if grep -q "Build succeeded" "$CM_BUILD_DIR/unity_build.log"; then
+              echo "✅ Unity build succeeded!"
+            elif grep -q "Build failed" "$CM_BUILD_DIR/unity_build.log"; then
+              echo "❌ Unity build failed. Last 50 lines of log:"
+              tail -50 "$CM_BUILD_DIR/unity_build.log"
+              exit 1
+            else
+              echo "⚠️  Build status unclear. Checking for Xcode project..."
+              # Check if Xcode project was created
+              if [ -d "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcodeproj" ] || [ -d "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcworkspace" ]; then
+                echo "✅ Xcode project found - build likely succeeded"
+              ls -la "$CM_BUILD_DIR/build/ios/"
+              else
+                echo "❌ Xcode project not found. Last 100 lines of log:"
+                tail -100 "$CM_BUILD_DIR/unity_build.log"
+                exit 1
+              fi
+            fi
+          else
+            echo "⚠️  Build log not found, but continuing..."
+          fi
+          
+      - name: Configure Xcode Project
+        script: |
+          echo "=========================================="
+          echo "Configuring Xcode project..."
+          echo "=========================================="
+          
+          set -e
+          cd "$CM_BUILD_DIR/build/ios"
+          
+          # Verify Xcode project exists
+          if [ ! -d "Unity-iPhone.xcodeproj" ] && [ ! -d "Unity-iPhone.xcworkspace" ]; then
+            echo "❌ Error: Xcode project not found!"
+            echo "Contents of build/ios directory:"
+            ls -la
+            exit 1
+          fi
+          
+          echo "✅ Xcode project found"
+          
+          # Find Info.plist
+          INFO_PLIST=""
+          if [ -f "Unity-iPhone/Info.plist" ]; then
+            INFO_PLIST="Unity-iPhone/Info.plist"
+          elif [ -f "Info.plist" ]; then
+            INFO_PLIST="Info.plist"
+          else
+            INFO_PLIST=$(find . -name Info.plist -type f | head -1)
+          fi
+          
+          if [ -z "$INFO_PLIST" ] || [ ! -f "$INFO_PLIST" ]; then
+            echo "⚠️  Warning: Info.plist not found, but continuing..."
+          else
+            echo "Updating Info.plist: $INFO_PLIST"
+            
+            # Set bundle identifier
+            /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${BUNDLE_ID}" "$INFO_PLIST" 2>/dev/null || \
+            echo "⚠️  Could not set bundle identifier"
+            
+            # Set version
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.0" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.0" "$INFO_PLIST" 2>/dev/null || \
+            echo "⚠️  Could not set version"
+            
+            # Set build number (uses CodeMagic build number)
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${CM_BUILD_NUMBER}" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${CM_BUILD_NUMBER}" "$INFO_PLIST" 2>/dev/null || \
+            echo "⚠️  Could not set build number"
+            
+            # Set minimum iOS version
+            /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 13.0" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string 13.0" "$INFO_PLIST" 2>/dev/null || \
+            echo "⚠️  Could not set minimum iOS version"
+            
+            echo "✅ Info.plist updated"
+            echo "Bundle ID: ${BUNDLE_ID}"
+            echo "Version: 1.0.0"
+            echo "Build Number: ${CM_BUILD_NUMBER}"
+          fi
+          
+      - name: Install CocoaPods Dependencies
+        script: |
+          echo "=========================================="
+          echo "Installing CocoaPods dependencies..."
+          echo "=========================================="
+          
+          cd "$CM_BUILD_DIR/build/ios"
+          
+          # Check if Podfile exists (Unity sometimes creates one)
+          if [ -f "Podfile" ]; then
+            echo "Podfile found, installing dependencies..."
+            pod install --repo-update || echo "⚠️  CocoaPods installation had issues, but continuing..."
+          else
+            echo "No Podfile found - this is normal for most Unity projects"
+            echo "Skipping CocoaPods installation"
+          fi
+          
+      - name: Build Xcode Archive
+        script: |
+          echo "=========================================="
+          echo "Building Xcode archive..."
+          echo "=========================================="
+          
+          set -e
+          cd "$CM_BUILD_DIR/build/ios"
+          
+          # Determine if we have workspace or project
+          if [ -d "Unity-iPhone.xcworkspace" ]; then
+            echo "Using Xcode workspace"
+            WORKSPACE="Unity-iPhone.xcworkspace"
+            SCHEME="Unity-iPhone"
+            
+            xcodebuild \
+              -workspace "$WORKSPACE" \
+              -scheme "$SCHEME" \
+              -configuration Release \
+              -archivePath "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" \
+              archive \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO \
+              -quiet
+              
+          elif [ -d "Unity-iPhone.xcodeproj" ]; then
+            echo "Using Xcode project"
+            PROJECT="Unity-iPhone.xcodeproj"
+            SCHEME="Unity-iPhone"
+            
+            xcodebuild \
+              -project "$PROJECT" \
+              -scheme "$SCHEME" \
+              -configuration Release \
+              -archivePath "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" \
+              archive \
+              CODE_SIGN_IDENTITY="" \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGNING_ALLOWED=NO \
+              -quiet
+          else
+            echo "❌ Error: No Xcode project or workspace found"
+            echo "Contents of build/ios:"
+            ls -la
+            exit 1
+          fi
+          
+          # Verify archive was created
+          if [ -d "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" ]; then
+            echo "✅ Archive created successfully"
+          else
+            echo "❌ Error: Archive not created"
+            exit 1
+          fi
+          
+      - name: Export IPA
+        script: |
+          echo "=========================================="
+          echo "Exporting IPA file..."
+          echo "=========================================="
+          
+          set -e
+          
+          # Check if exportOptions.plist exists in project root
+          if [ ! -f "$CM_BUILD_DIR/exportOptions.plist" ]; then
+            echo "Creating default exportOptions.plist..."
+            cat > "$CM_BUILD_DIR/exportOptions.plist" << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <true/>
+              <key>compileBitcode</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
+            echo "✅ Created default exportOptions.plist"
+          else
+            echo "✅ Using existing exportOptions.plist"
+          fi
+          
+          # Export IPA
+          echo "Exporting archive to IPA..."
+          xcodebuild -exportArchive \
+            -archivePath "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" \
+            -exportPath "$CM_BUILD_DIR/build/ios/export" \
+            -exportOptionsPlist "$CM_BUILD_DIR/exportOptions.plist" \
+            -quiet || {
+              echo "❌ IPA export failed"
+              echo "Note: Code signing errors are normal here if you haven't configured certificates yet"
+              echo "You can configure code signing in CodeMagic dashboard > Code signing"
+              exit 1
+            }
+          
+          # Verify IPA was created
+          IPA_FILE=$(find "$CM_BUILD_DIR/build/ios/export" -name "*.ipa" | head -1)
+          if [ -n "$IPA_FILE" ] && [ -f "$IPA_FILE" ]; then
+            echo "✅ IPA created successfully!"
+            echo "IPA file: $IPA_FILE"
+            ls -lh "$IPA_FILE"
+          else
+            echo "❌ Error: IPA file not found"
+            echo "Contents of export directory:"
+            ls -la "$CM_BUILD_DIR/build/ios/export/" || echo "Export directory doesn't exist"
+            exit 1
+          fi
+          
+    artifacts:
+      - build/ios/export/*.ipa
+      - build/ios/Unity-iPhone.xcarchive
+      - unity_build.log
+      
+    publishing:
+      email:
+        recipients:
+          - user@example.com  # ⚠️ CHANGE THIS to your email address!
+        notify:
+          success: true
+          failure: true
+      app_store_connect:
+        # Uncomment and configure these when ready for automatic TestFlight uploads
+        # You'll need to set up App Store Connect API keys in CodeMagic first
+        # auth: integration
+        # submit_to_testflight: true
+        # beta_groups:
+        #   - Internal Testers

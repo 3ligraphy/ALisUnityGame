@@ -72,6 +72,11 @@ mono_crash.*
 *.unitypackage
 *.unitypackage.meta
 *.app
+*.ipa
+*.xcarchive
+*.dSYM.zip
+build/ios/
+DerivedData/
 
 # Crashlytics generated file
 crashlytics-build.properties
