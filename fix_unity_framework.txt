@@ -1,0 +1,29 @@
+REPLACE LINES 320-399 in codemagic.yaml WITH THIS:
+
+      - name: Fix UnityFramework automatic signing
+        script: |
+          echo "=========================================="
+          echo "Setting UnityFramework to automatic signing..."
+          echo "=========================================="
+          
+          cd "$CM_BUILD_DIR/build/ios"
+          
+          PROJECT_FILE="Unity-iPhone.xcodeproj/project.pbxproj"
+          
+          if [ ! -f "$PROJECT_FILE" ]; then
+            echo "❌ Error: project.pbxproj not found"
+            exit 1
+          fi
+          
+          echo "Modifying UnityFramework signing to automatic..."
+          cp "$PROJECT_FILE" "${PROJECT_FILE}.backup"
+          
+          # Use awk to change CODE_SIGN_STYLE for UnityFramework
+          awk '
+            /UnityFramework/ {framework=1}
+            framework && /CODE_SIGN_STYLE = Manual;/ {gsub(/Manual/, "Automatic")}
+            framework && /^[[:space:]]*};$/ {framework=0}
+            {print}
+          ' "$PROJECT_FILE" > "${PROJECT_FILE}.tmp" && mv "${PROJECT_FILE}.tmp" "$PROJECT_FILE"
+          
+          echo "✅ UnityFramework set to automatic signing"

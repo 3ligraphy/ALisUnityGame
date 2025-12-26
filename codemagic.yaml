@@ -325,10 +325,6 @@ workflows:
           
           cd "$CM_BUILD_DIR/build/ios"
           
-          # Unity's UnityFramework target requires automatic signing
-          # xcode-project use-profiles sets everything to manual, which breaks UnityFramework
-          # We need to set UnityFramework back to automatic signing
-          
           PROJECT_FILE="Unity-iPhone.xcodeproj/project.pbxproj"
           
           if [ ! -f "$PROJECT_FILE" ]; then
@@ -336,67 +332,18 @@ workflows:
             exit 1
           fi
           
-          echo "Modifying $PROJECT_FILE to set UnityFramework to automatic signing..."
-          
-          # Use sed to replace CODE_SIGN_STYLE for UnityFramework target only
-          # We need to find the UnityFramework target sections and change Manual to Automatic
-          
-          # Create a backup
+          echo "Modifying UnityFramework signing to automatic..."
           cp "$PROJECT_FILE" "${PROJECT_FILE}.backup"
           
-          # This script will set CODE_SIGN_STYLE = Automatic for UnityFramework sections
-          # We look for sections between /* Begin PBXNativeTarget section */ for UnityFramework
-          python3 <<'PYTHON_SCRIPT'
-import re
-
-project_file = "Unity-iPhone.xcodeproj/project.pbxproj"
-
-with open(project_file, 'r') as f:
-    content = f.read()
-
-# Find UnityFramework target sections and set to automatic signing
-# Pattern: Look for UnityFramework buildSettings sections and change CODE_SIGN_STYLE
-lines = content.split('\n')
-in_unity_framework_target = False
-in_build_settings = 0
-modified_lines = []
-
-for i, line in enumerate(lines):
-    # Detect if we're in a UnityFramework section
-    if 'UnityFramework' in line and 'PBXNativeTarget' in line:
-        in_unity_framework_target = True
-    
-    # Detect when we exit the target section
-    if in_unity_framework_target and line.strip().startswith('};') and 'PBXNativeTarget' in lines[i+1] if i+1 < len(lines) else False:
-        in_unity_framework_target = False
-    
-    # If in UnityFramework section, track buildSettings blocks
-    if in_unity_framework_target:
-        if 'buildSettings = {' in line:
-            in_build_settings += 1
-        elif in_build_settings > 0 and line.strip() == '};':
-            in_build_settings -= 1
-        
-        # Replace CODE_SIGN_STYLE in UnityFramework buildSettings
-        if in_build_settings > 0 and 'CODE_SIGN_STYLE' in line:
-            line = re.sub(r'CODE_SIGN_STYLE = Manual;', 'CODE_SIGN_STYLE = Automatic;', line)
-            print(f"✅ Changed CODE_SIGN_STYLE to Automatic in UnityFramework")
-        
-        # Remove PROVISIONING_PROFILE_SPECIFIER from UnityFramework
-        if in_build_settings > 0 and 'PROVISIONING_PROFILE_SPECIFIER' in line:
-            print(f"✅ Removing PROVISIONING_PROFILE_SPECIFIER from UnityFramework")
-            continue  # Skip this line
-    
-    modified_lines.append(line)
-
-# Write modified content
-with open(project_file, 'w') as f:
-    f.write('\n'.join(modified_lines))
-
-print("✅ UnityFramework set to automatic signing")
-PYTHON_SCRIPT
+          # Use awk to change CODE_SIGN_STYLE for UnityFramework
+          awk '
+            /UnityFramework/ {framework=1}
+            framework && /CODE_SIGN_STYLE = Manual;/ {gsub(/Manual/, "Automatic")}
+            framework && /^[[:space:]]*};$/ {framework=0}
+            {print}
+          ' "$PROJECT_FILE" > "${PROJECT_FILE}.tmp" && mv "${PROJECT_FILE}.tmp" "$PROJECT_FILE"
           
-          echo "✅ UnityFramework automatic signing configured"
+          echo "✅ UnityFramework set to automatic signing"
           
       - name: Install CocoaPods Dependencies
         script: |
