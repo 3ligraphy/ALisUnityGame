@@ -243,20 +243,6 @@ workflows:
           keychain add-certificates
           echo "✅ Certificates added to keychain"
       
-      - name: Set up code signing settings on Xcode project
-        script: |
-          echo "=========================================="
-          echo "Applying provisioning profiles to Xcode..."
-          echo "=========================================="
-          
-          cd "$CM_BUILD_DIR/build/ios"
-          
-          # Apply the fetched provisioning profiles to the Xcode project
-          # This uses CodeMagic's xcode-project tool to automatically configure signing
-          xcode-project use-profiles
-          
-          echo "✅ Code signing profiles applied to Xcode project"
-      
       - name: Configure Xcode Project
         script: |
           echo "=========================================="
@@ -316,6 +302,20 @@ workflows:
             echo "Version: 1.0.0"
             echo "Build Number: ${CM_BUILD_NUMBER}"
           fi
+      
+      - name: Set up code signing settings on Xcode project
+        script: |
+          echo "=========================================="
+          echo "Applying provisioning profiles to Xcode..."
+          echo "=========================================="
+          
+          cd "$CM_BUILD_DIR/build/ios"
+          
+          # Apply the fetched provisioning profiles to the Xcode project
+          # This uses CodeMagic's xcode-project tool to automatically configure signing
+          xcode-project use-profiles
+          
+          echo "✅ Code signing profiles applied to Xcode project"
           
       - name: Install CocoaPods Dependencies
         script: |
