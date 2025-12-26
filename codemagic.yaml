@@ -40,9 +40,6 @@ workflows:
         
       xcode: latest
       cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.failaka.games.adventure
     
     cache:
       cache_paths:
@@ -222,25 +219,29 @@ workflows:
             echo "⚠️  Build log not found, but continuing..."
           fi
           
-      - name: Verify Code Signing Setup
+      - name: Initialize keychain
         script: |
           echo "=========================================="
-          echo "Verifying Apple Developer Integration..."
+          echo "Initializing keychain for code signing..."
           echo "=========================================="
-          
-          # Check if code signing certificates are available
-          echo "Checking for signing certificates..."
-          security find-identity -v -p codesigning || echo "No signing certificates found"
-          
-          # Check if provisioning profiles are available
-          echo "Checking for provisioning profiles..."
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No provisioning profiles found"
-          
-          # List available certificates
-          echo "Available certificates:"
-          security find-identity -p codesigning -v | grep "Apple" || echo "⚠️ No Apple certificates found"
-          
-          echo "✅ Code signing verification complete"
+          keychain initialize
+          echo "✅ Keychain initialized"
+      
+      - name: Fetch signing files
+        script: |
+          echo "=========================================="
+          echo "Fetching signing files from App Store Connect..."
+          echo "=========================================="
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE
+          echo "✅ Signing files fetched"
+      
+      - name: Add certificates to keychain
+        script: |
+          echo "=========================================="
+          echo "Adding certificates to keychain..."
+          echo "=========================================="
+          keychain add-certificates
+          echo "✅ Certificates added to keychain"
       
       - name: Set up code signing settings on Xcode project
         script: |
@@ -333,131 +334,23 @@ workflows:
             echo "Skipping CocoaPods installation"
           fi
           
-      - name: Build Xcode Archive
+      - name: Build IPA
         script: |
           echo "=========================================="
-          echo "Building Xcode archive..."
-          echo "=========================================="
-          
-          set -e
-          cd "$CM_BUILD_DIR/build/ios"
-          
-          # Determine if we have workspace or project
-          if [ -d "Unity-iPhone.xcworkspace" ]; then
-            echo "Using Xcode workspace"
-            WORKSPACE="Unity-iPhone.xcworkspace"
-            SCHEME="Unity-iPhone"
-            
-            # Build with manual signing (configured by xcode-project use-profiles)
-            echo "Building Xcode archive..."
-            xcodebuild \
-              -workspace "$WORKSPACE" \
-              -scheme "$SCHEME" \
-              -configuration Release \
-              -archivePath "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" \
-              archive \
-              -quiet
-              
-          elif [ -d "Unity-iPhone.xcodeproj" ]; then
-            echo "Using Xcode project"
-            PROJECT="Unity-iPhone.xcodeproj"
-            SCHEME="Unity-iPhone"
-            
-            # Build with manual signing (configured by xcode-project use-profiles)
-            echo "Building Xcode archive..."
-            xcodebuild \
-              -project "$PROJECT" \
-              -scheme "$SCHEME" \
-              -configuration Release \
-              -archivePath "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" \
-              archive \
-              -quiet
-          else
-            echo "❌ Error: No Xcode project or workspace found"
-            echo "Contents of build/ios:"
-            ls -la
-            exit 1
-          fi
-          
-          # Verify archive was created
-          if [ -d "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" ]; then
-            echo "✅ Archive created successfully"
-          else
-            echo "❌ Error: Archive not created"
-            exit 1
-          fi
-          
-      - name: Export IPA
-        script: |
-          echo "=========================================="
-          echo "Exporting IPA file..."
+          echo "Building IPA with xcode-project..."
           echo "=========================================="
           
           set -e
           
-          # Check if exportOptions.plist exists in project root
-          if [ ! -f "$CM_BUILD_DIR/exportOptions.plist" ]; then
-            echo "Creating exportOptions.plist for automatic code signing..."
-            cat > "$CM_BUILD_DIR/exportOptions.plist" << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store</string>
-              <key>uploadBitcode</key>
-              <false/>
-              <key>uploadSymbols</key>
-              <true/>
-              <key>compileBitcode</key>
-              <false/>
-              <key>signingStyle</key>
-              <string>automatic</string>
-          </dict>
-          </plist>
-          EOF
-            echo "✅ Created exportOptions.plist with automatic signing"
-          else
-            echo "✅ Using existing exportOptions.plist"
-            # Ensure automatic signing is set
-            /usr/libexec/PlistBuddy -c "Set :signingStyle automatic" "$CM_BUILD_DIR/exportOptions.plist" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Add :signingStyle string automatic" "$CM_BUILD_DIR/exportOptions.plist" 2>/dev/null || \
-            echo "⚠️  Could not set signingStyle, but continuing..."
-          fi
+          # Use CodeMagic's xcode-project tool to build IPA
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcodeproj" \
+            --scheme "Unity-iPhone"
           
-          # Export IPA with automatic code signing
-          # CodeMagic will use the Apple Developer integration you configured
-          echo "Exporting archive to IPA with automatic code signing..."
-          echo "CodeMagic will use your Apple Developer integration for signing..."
-          xcodebuild -exportArchive \
-            -archivePath "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" \
-            -exportPath "$CM_BUILD_DIR/build/ios/export" \
-            -exportOptionsPlist "$CM_BUILD_DIR/exportOptions.plist" \
-            -quiet || {
-              echo "❌ IPA export failed"
-              echo "Check that:"
-              echo "1. Apple Developer integration is configured in CodeMagic Settings > Integrations"
-              echo "2. Your bundle ID matches the one in App Store Connect"
-              echo "3. Your Team ID is correct"
-              exit 1
-            }
-          
-          # Verify IPA was created
-          IPA_FILE=$(find "$CM_BUILD_DIR/build/ios/export" -name "*.ipa" | head -1)
-          if [ -n "$IPA_FILE" ] && [ -f "$IPA_FILE" ]; then
-            echo "✅ IPA created successfully!"
-            echo "IPA file: $IPA_FILE"
-            ls -lh "$IPA_FILE"
-          else
-            echo "❌ Error: IPA file not found"
-            echo "Contents of export directory:"
-            ls -la "$CM_BUILD_DIR/build/ios/export/" || echo "Export directory doesn't exist"
-            exit 1
-          fi
-          
+          echo "✅ IPA built successfully"
+      
     artifacts:
-      - build/ios/export/*.ipa
-      - build/ios/Unity-iPhone.xcarchive
+      - build/ios/ipa/*.ipa
       - unity_build.log
       
     publishing:
