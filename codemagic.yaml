@@ -22,9 +22,6 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m1
     environment:
-      groups:
-        # Add your CodeMagic API token group here (optional, for App Store Connect automation)
-        # - app_store_credentials
       vars:
         # Unity version - matches your project version
         UNITY_VERSION: "6000.2.15f1"
