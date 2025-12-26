@@ -174,19 +174,20 @@ workflows:
           
           echo "✅ Using Unity ${UNITY_VERSION} at: $UNITY_PATH"
           
-          # Build Unity project for iOS
-          # For Personal license, we don't use -serial parameter
+          # Set environment variables for build script
+          export IOS_BUILD_PATH="$CM_BUILD_DIR/build/ios"
+          export BUILD_NUMBER="${CM_BUILD_NUMBER}"
+          
+          # Build Unity project for iOS using BuildScript.cs
           echo "Starting Unity build (this may take 10-20 minutes)..."
+          echo "Build will use -executeMethod BuildScript.BuildIOS"
           
           $UNITY_PATH \
             -quit \
             -batchmode \
             -nographics \
             -projectPath "$CM_BUILD_DIR" \
-            -buildTarget iOS \
-            -buildPath "$CM_BUILD_DIR/build/ios" \
-            -username "${UNITY_EMAIL}" \
-            -password "${UNITY_PASSWORD}" \
+            -executeMethod BuildScript.BuildIOS \
             -logFile "$CM_BUILD_DIR/unity_build.log" \
             || true
           
