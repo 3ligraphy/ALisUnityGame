@@ -27,9 +27,9 @@ workflows:
       # The actual project build uses Unity 6000.2.15f1 installed via Unity Hub CLI
       unity: 2022.3.47f1
       vars:
-        # Unity account credentials - REPLACE WITH YOUR ACTUAL VALUES
+        # Unity Student account credentials (includes headless build rights)
         # ⚠️ WARNING: These will be visible in your Git repository!
-        UNITY_EMAIL: "amohamad343@gmail.com"  # Your Gmail address
+        UNITY_EMAIL: "ali.motawea@bue.edu.eg"  # Your Unity Student account
         UNITY_PASSWORD: "AJ1422003249aj*"      # Your Unity password
         
         # Bundle identifier - already configured for your app
