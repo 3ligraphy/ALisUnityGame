@@ -40,6 +40,14 @@ workflows:
         
       xcode: latest
       cocoapods: default
+    
+    cache:
+      cache_paths:
+        # Cache Unity 6000.2.15f1 installation to speed up subsequent builds
+        # First build: ~30-50 min | Subsequent builds: ~15-30 min (saves 10-15 min)
+        - /Applications/Unity/Hub/Editor/$UNITY_VERSION
+        # Also cache Unity Hub to avoid re-downloading it
+        - /Applications/Unity/Hub
       
     scripts:
       - name: Detect Unity Version from Project
@@ -68,8 +76,10 @@ workflows:
           echo "Activating Unity license..."
           echo "=========================================="
           
+          # Ensure license directory exists
+          mkdir -p "$HOME/Library/Application Support/Unity"
+          
           # Use the pre-installed Unity from environment (2022.3.47f1)
-          # This is required before Unity Hub CLI commands work
           TEMP_UNITY=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
           
           if [ -z "$TEMP_UNITY" ]; then
@@ -80,19 +90,29 @@ workflows:
           fi
           
           echo "Using Unity at: $TEMP_UNITY"
-          echo "Activating with email: ${UNITY_EMAIL}"
+          echo "Activating Unity Personal license with email: ${UNITY_EMAIL}"
           
-          # Activate Unity license
+          # Activate Unity license (Personal/Free license)
+          # For Personal license, use -serial flag without serial number
           $TEMP_UNITY \
             -quit \
             -batchmode \
             -nographics \
+            -serial \
             -username "${UNITY_EMAIL}" \
             -password "${UNITY_PASSWORD}" \
-            -logFile - \
-            || echo "✅ License activation completed (exit code ignored)"
+            -logFile - || true
           
-          echo "✅ Unity license activated"
+          # Wait a moment for license file to be created
+          sleep 3
+          
+          # Check if license was activated
+          if [ -f "$HOME/Library/Application Support/Unity/Unity_lic.ulf" ]; then
+            echo "✅ Unity license activated successfully"
+            echo "License file created at: $HOME/Library/Application Support/Unity/Unity_lic.ulf"
+          else
+            echo "⚠️ License file not found, but continuing (activation may have succeeded)"
+          fi
       
       - name: Install Unity Version via Unity Hub
         script: |
@@ -402,6 +422,31 @@ workflows:
       - unity_build.log
       
     publishing:
+      scripts:
+        - name: Deactivate Unity License
+          script: |
+            echo "=========================================="
+            echo "Returning Unity license..."
+            echo "=========================================="
+            
+            # Return license to free up seat for future builds
+            TEMP_UNITY=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+            
+            if [ -n "$TEMP_UNITY" ]; then
+              echo "Using Unity at: $TEMP_UNITY"
+              $TEMP_UNITY \
+                -quit \
+                -batchmode \
+                -nographics \
+                -returnlicense \
+                -username "${UNITY_EMAIL}" \
+                -password "${UNITY_PASSWORD}" \
+                -logFile - || echo "License return attempted"
+              
+              echo "✅ Unity license returned"
+            else
+              echo "⚠️ Unity not found, skipping license return"
+            fi
       email:
         recipients:
           - amohamad343@gmail.com  # Your email for build notifications
