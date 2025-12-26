@@ -22,10 +22,8 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m1
     environment:
-      # Unity version - check https://docs.codemagic.io/knowledge-others/install-unity-version/ for supported versions
-      # This project uses Unity 6000.2.15f1 (Unity 6)
-      # Unity 6 LTS versions newer than 6000.0.37f1 are automatically supported
-      unity: 6000.2.15f1  # Unity 6 version used by this project
+      # Unity version will be detected from ProjectSettings/ProjectVersion.txt and installed via Unity Hub
+      # This allows installation of any Unity version, including 6000.2.15f1
       vars:
         # Unity account credentials - REPLACE WITH YOUR ACTUAL VALUES
         # ⚠️ WARNING: These will be visible in your Git repository!
@@ -42,31 +40,92 @@ workflows:
       cocoapods: default
       
     scripts:
-      - name: Verify Unity Installation
+      - name: Detect Unity Version from Project
         script: |
           echo "=========================================="
-          echo "Verifying Unity installation..."
+          echo "Detecting Unity version from project..."
           echo "=========================================="
-          echo "CodeMagic should have installed Unity automatically"
-          echo "Checking Unity installation..."
           
-          # CodeMagic installs Unity to standard location
-          UNITY_VERSION="6000.2.15f1"
-          UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
+          # Extract Unity version and changeset from ProjectSettings/ProjectVersion.txt
+          UNITY_VERSION=$(echo $(sed -n '1p' ProjectSettings/ProjectVersion.txt) | cut -c 18-)
+          UNITY_VERSION_CHANGESET=$(echo $(sed -n '2p' ProjectSettings/ProjectVersion.txt) | cut -d "(" -f2 | cut -d ")" -f1 | xargs)
+          
+          echo "Unity Version: $UNITY_VERSION"
+          echo "Changeset: $UNITY_VERSION_CHANGESET"
+          
+          # Export to environment for use in subsequent scripts
+          echo "UNITY_VERSION=$UNITY_VERSION" >> $CM_ENV
+          echo "UNITY_VERSION_CHANGESET=$UNITY_VERSION_CHANGESET" >> $CM_ENV
+          echo "UNITY_HOME=/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity.app" >> $CM_ENV
+          
+          echo "✅ Unity version detected: $UNITY_VERSION"
+      
+      - name: Activate Unity License
+        script: |
+          echo "=========================================="
+          echo "Activating Unity license..."
+          echo "=========================================="
+          
+          # Use pre-installed Unity for license activation
+          # Find any available Unity installation for license activation
+          TEMP_UNITY=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+          
+          if [ -z "$TEMP_UNITY" ]; then
+            echo "❌ No Unity installation found for license activation"
+            exit 1
+          fi
+          
+          echo "Using Unity at: $TEMP_UNITY"
+          echo "Activating with email: ${UNITY_EMAIL}"
+          
+          # Activate Unity license (required before Unity Hub commands work)
+          $TEMP_UNITY \
+            -quit \
+            -batchmode \
+            -nographics \
+            -username "${UNITY_EMAIL}" \
+            -password "${UNITY_PASSWORD}" \
+            -logFile - \
+            || echo "License activation completed (errors may be normal)"
+      
+      - name: Install Unity Version via Unity Hub
+        script: |
+          echo "=========================================="
+          echo "Installing Unity ${UNITY_VERSION}..."
+          echo "=========================================="
+          
+          # Check if Unity version is already installed
+          UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity.app/Contents/MacOS/Unity"
           
           if [ -f "$UNITY_PATH" ]; then
-            echo "✅ Unity ${UNITY_VERSION} found at: $UNITY_PATH"
-            "$UNITY_PATH" -version || echo "Could not get Unity version"
+            echo "✅ Unity ${UNITY_VERSION} already installed"
           else
-            echo "⚠️  Unity not found at expected path, searching..."
-            FOUND_UNITY=$(find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
-            if [ -n "$FOUND_UNITY" ]; then
-              echo "✅ Found Unity at: $FOUND_UNITY"
-            else
-              echo "❌ Unity not found. CodeMagic should install it automatically."
-              echo "Check that 'unity: 2022.3.20f1' is set in environment section."
-              exit 1
-            fi
+            echo "Installing Unity ${UNITY_VERSION} with iOS and Android modules..."
+            
+            # Install Unity version with required modules
+            yes Y | /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- \
+              --headless install \
+              --version $UNITY_VERSION \
+              --changeset $UNITY_VERSION_CHANGESET \
+              -a arm64
+            
+            # Install iOS and Android build support modules
+            yes Y | /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- \
+              --headless install-modules \
+              --version $UNITY_VERSION \
+              -m ios android \
+              -a arm64
+            
+            echo "✅ Unity ${UNITY_VERSION} installation complete"
+          fi
+          
+          # Verify installation
+          if [ -f "$UNITY_PATH" ]; then
+            echo "✅ Unity verified at: $UNITY_PATH"
+            "$UNITY_PATH" -version || echo "Unity executable found"
+          else
+            echo "❌ Unity installation failed"
+            exit 1
           fi
       
       - name: Build Unity Project for iOS
@@ -78,24 +137,16 @@ workflows:
           
           set -e
           
-          # CodeMagic installs Unity automatically, so use the standard path
-          UNITY_VERSION="6000.2.15f1"
-          UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
+          # Use the Unity version we just installed
+          UNITY_PATH="$UNITY_HOME/Contents/MacOS/Unity"
           
-          # Verify Unity exists (CodeMagic should have installed it)
+          # Verify Unity exists
           if [ ! -f "$UNITY_PATH" ]; then
-            echo "⚠️  Unity not found at standard path, searching..."
-            UNITY_PATH=$(find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
-            if [ -z "$UNITY_PATH" ] || [ ! -f "$UNITY_PATH" ]; then
-              echo "❌ Error: Unity executable not found!"
-              echo "CodeMagic should have installed Unity ${UNITY_VERSION} automatically."
-              echo "Check that 'unity: 2022.3.20f1' is set in the environment section."
-              exit 1
-            fi
-            echo "✅ Found Unity at: $UNITY_PATH"
-          else
-            echo "✅ Using Unity at: $UNITY_PATH"
+            echo "❌ Error: Unity executable not found at: $UNITY_PATH"
+            exit 1
           fi
+          
+          echo "✅ Using Unity ${UNITY_VERSION} at: $UNITY_PATH"
           
           # Build Unity project for iOS
           # For Personal license, we don't use -serial parameter
