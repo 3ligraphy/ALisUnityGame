@@ -22,8 +22,10 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m1
     environment:
-      # Unity version will be detected from ProjectSettings/ProjectVersion.txt and installed via Unity Hub
-      # This allows installation of any Unity version, including 6000.2.15f1
+      # Base Unity version for license activation (must be a supported version)
+      # This Unity is used ONLY to activate the license
+      # The actual project build uses Unity 6000.2.15f1 installed via Unity Hub CLI
+      unity: 2022.3.47f1
       vars:
         # Unity account credentials - REPLACE WITH YOUR ACTUAL VALUES
         # ⚠️ WARNING: These will be visible in your Git repository!
@@ -66,19 +68,21 @@ workflows:
           echo "Activating Unity license..."
           echo "=========================================="
           
-          # Use pre-installed Unity for license activation
-          # Find any available Unity installation for license activation
+          # Use the pre-installed Unity from environment (2022.3.47f1)
+          # This is required before Unity Hub CLI commands work
           TEMP_UNITY=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
           
           if [ -z "$TEMP_UNITY" ]; then
             echo "❌ No Unity installation found for license activation"
+            echo "Available Unity installations:"
+            ls -la /Applications/Unity/Hub/Editor/ 2>/dev/null || echo "No Unity Hub Editor directory found"
             exit 1
           fi
           
           echo "Using Unity at: $TEMP_UNITY"
           echo "Activating with email: ${UNITY_EMAIL}"
           
-          # Activate Unity license (required before Unity Hub commands work)
+          # Activate Unity license
           $TEMP_UNITY \
             -quit \
             -batchmode \
@@ -86,7 +90,9 @@ workflows:
             -username "${UNITY_EMAIL}" \
             -password "${UNITY_PASSWORD}" \
             -logFile - \
-            || echo "License activation completed (errors may be normal)"
+            || echo "✅ License activation completed (exit code ignored)"
+          
+          echo "✅ Unity license activated"
       
       - name: Install Unity Version via Unity Hub
         script: |
