@@ -40,6 +40,9 @@ workflows:
         
       xcode: latest
       cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.failaka.games.adventure
     
     cache:
       cache_paths:
@@ -238,6 +241,20 @@ workflows:
           security find-identity -p codesigning -v | grep "Apple" || echo "⚠️ No Apple certificates found"
           
           echo "✅ Code signing verification complete"
+      
+      - name: Set up code signing settings on Xcode project
+        script: |
+          echo "=========================================="
+          echo "Applying provisioning profiles to Xcode..."
+          echo "=========================================="
+          
+          cd "$CM_BUILD_DIR/build/ios"
+          
+          # Apply the fetched provisioning profiles to the Xcode project
+          # This uses CodeMagic's xcode-project tool to automatically configure signing
+          xcode-project use-profiles
+          
+          echo "✅ Code signing profiles applied to Xcode project"
       
       - name: Configure Xcode Project
         script: |
