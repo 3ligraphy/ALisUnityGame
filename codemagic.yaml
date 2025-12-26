@@ -126,7 +126,7 @@ workflows:
           if [ -f "$UNITY_PATH" ]; then
             echo "✅ Unity ${UNITY_VERSION} already installed"
           else
-            echo "Installing Unity ${UNITY_VERSION} with iOS and Android modules..."
+            echo "Installing Unity ${UNITY_VERSION} with iOS module only..."
             
             # Install Unity version with required modules
             yes Y | /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- \
@@ -135,11 +135,11 @@ workflows:
               --changeset $UNITY_VERSION_CHANGESET \
               -a arm64
             
-            # Install iOS and Android build support modules
+            # Install iOS Build Support module only (no Android for iOS-only builds)
             yes Y | /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- \
               --headless install-modules \
               --version $UNITY_VERSION \
-              -m ios android \
+              -m ios \
               -a arm64
             
             echo "✅ Unity ${UNITY_VERSION} installation complete"
