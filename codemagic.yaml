@@ -348,15 +348,13 @@ workflows:
             WORKSPACE="Unity-iPhone.xcworkspace"
             SCHEME="Unity-iPhone"
             
-            # Build with automatic code signing using Apple Developer integration
-            echo "Building with automatic code signing..."
+            # Build with manual signing (configured by xcode-project use-profiles)
+            echo "Building Xcode archive..."
             xcodebuild \
               -workspace "$WORKSPACE" \
               -scheme "$SCHEME" \
               -configuration Release \
               -archivePath "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" \
-              -allowProvisioningUpdates \
-              CODE_SIGN_STYLE=Automatic \
               archive \
               -quiet
               
@@ -365,15 +363,13 @@ workflows:
             PROJECT="Unity-iPhone.xcodeproj"
             SCHEME="Unity-iPhone"
             
-            # Build with automatic code signing using Apple Developer integration
-            echo "Building with automatic code signing..."
+            # Build with manual signing (configured by xcode-project use-profiles)
+            echo "Building Xcode archive..."
             xcodebuild \
               -project "$PROJECT" \
               -scheme "$SCHEME" \
               -configuration Release \
               -archivePath "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcarchive" \
-              -allowProvisioningUpdates \
-              CODE_SIGN_STYLE=Automatic \
               archive \
               -quiet
           else
