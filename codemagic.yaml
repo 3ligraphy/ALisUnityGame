@@ -22,19 +22,13 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m1
     environment:
+      # CodeMagic automatically installs Unity when you specify the version here
+      unity: 6000.2.15f1
       vars:
-        # Unity version - matches your project version
-        UNITY_VERSION: "6000.2.15f1"
-        
-        # Unity Personal License - NO SERIAL NUMBER NEEDED!
-        # For Personal license, leave UNITY_SERIAL empty or don't set it
-        # Only Plus/Pro licenses need a serial number
-        # UNITY_SERIAL: ""  # Leave empty for Personal license
-        
         # Unity account credentials - REPLACE WITH YOUR ACTUAL VALUES
         # ⚠️ WARNING: These will be visible in your Git repository!
-        UNITY_EMAIL: "amohamad343@gmail.com"  # ⚠️ REPLACE with your Gmail address
-        UNITY_PASSWORD: "AJ1422003249aj*"      # ⚠️ REPLACE with your Unity password
+        UNITY_EMAIL: "amohamad343@gmail.com"  # Your Gmail address
+        UNITY_PASSWORD: "AJ1422003249aj*"      # Your Unity password
         
         # Bundle identifier - already configured for your app
         BUNDLE_ID: "com.failaka.games.adventure"
@@ -46,97 +40,32 @@ workflows:
       cocoapods: default
       
     scripts:
-      - name: Install Unity
+      - name: Verify Unity Installation
         script: |
           echo "=========================================="
-          echo "Installing Unity ${UNITY_VERSION}..."
+          echo "Verifying Unity installation..."
           echo "=========================================="
           
-          # Check if Unity is already installed
-          if [ -f "/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity" ]; then
-            echo "✅ Unity ${UNITY_VERSION} is already installed"
-            exit 0
-          fi
+          # CodeMagic automatically installs Unity when you specify unity: in environment
+          # Check if Unity is available at the standard CodeMagic path
+          UNITY_VERSION="6000.2.15f1"
+          UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
           
-          # Check for any Unity installation
-          EXISTING_UNITY=$(find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
-          if [ -n "$EXISTING_UNITY" ]; then
-            echo "⚠️  Found existing Unity installation at: $EXISTING_UNITY"
-            echo "Will try to use it if version ${UNITY_VERSION} is not available"
-          fi
-          
-          echo "Downloading Unity ${UNITY_VERSION} installer..."
-          
-          # Create temp directory
-          mkdir -p /tmp/unity_install
-          cd /tmp/unity_install
-          
-          # Try multiple download URLs
-          UNITY_URLS=(
-            "https://download.unity3d.com/download_unity/${UNITY_VERSION}/MacEditorInstaller/Unity-${UNITY_VERSION}.pkg"
-            "https://beta.unity3d.com/download/${UNITY_VERSION}/MacEditorInstaller/Unity-${UNITY_VERSION}.pkg"
-            "https://download.unity3d.com/download_unity/${UNITY_VERSION}/MacEditorInstaller/Unity.pkg"
-          )
-          
-          DOWNLOAD_SUCCESS=false
-          for URL in "${UNITY_URLS[@]}"; do
-            echo "Trying: $URL"
-            if curl -L -f -o unity.pkg "$URL" 2>/dev/null; then
-              echo "✅ Download successful from: $URL"
-              DOWNLOAD_SUCCESS=true
-              break
-            else
-              echo "❌ Failed to download from: $URL"
-            fi
-          done
-          
-          if [ "$DOWNLOAD_SUCCESS" = false ]; then
-            echo "❌ Failed to download Unity installer from all URLs"
-            echo ""
-            echo "Possible solutions:"
-            echo "1. Check if Unity version ${UNITY_VERSION} is available"
-            echo "2. Unity version might need to be installed manually"
-            echo "3. Try using a different Unity version"
-            echo ""
-            echo "If you have Unity Hub installed, you can install Unity manually:"
-            echo "  - Open Unity Hub"
-            echo "  - Go to Installs tab"
-            echo "  - Install Unity ${UNITY_VERSION}"
-            exit 1
-          fi
-          
-          # Install Unity
-          echo "Installing Unity package..."
-          sudo installer -pkg unity.pkg -target / -allowUntrusted -verboseR || {
-            echo "❌ Failed to install Unity package"
-            echo "Trying with different installer options..."
-            sudo installer -pkg unity.pkg -target / -verboseR || {
-              echo "❌ Installation failed completely"
-              exit 1
-            }
-          }
-          
-          # Clean up
-          cd /
-          rm -rf /tmp/unity_install
-          
-          # Wait a moment for installation to complete
-          sleep 2
-          
-          # Verify installation
-          echo "Verifying Unity installation..."
-          if [ -f "/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity" ]; then
-            echo "✅ Unity ${UNITY_VERSION} installed successfully at Hub location"
-          elif [ -f "/Applications/Unity/Unity.app/Contents/MacOS/Unity" ]; then
-            echo "✅ Unity installed at /Applications/Unity/Unity.app"
+          if [ -f "$UNITY_PATH" ]; then
+            echo "✅ Unity ${UNITY_VERSION} found at: $UNITY_PATH"
+            "$UNITY_PATH" -version || echo "Could not get Unity version"
           else
-            echo "⚠️  Unity installed but not found at expected paths"
-            echo "Searching for Unity installation..."
-            find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | while read path; do
-              echo "Found: $path"
-            done
-            echo ""
-            echo "⚠️  Continuing anyway - build step will try to find Unity"
+            echo "⚠️  Unity not found at expected path, searching..."
+            # Try to find Unity anywhere
+            FOUND_UNITY=$(find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+            if [ -n "$FOUND_UNITY" ]; then
+              echo "✅ Found Unity at: $FOUND_UNITY"
+              UNITY_PATH="$FOUND_UNITY"
+            else
+              echo "❌ Unity not found. CodeMagic should install it automatically."
+              echo "Check that unity: 6000.2.15f1 is set in environment section."
+              exit 1
+            fi
           fi
           
       - name: Build Unity Project for iOS
@@ -148,51 +77,24 @@ workflows:
           
           set -e
           
-          # Find Unity executable (should be installed by previous step)
-          UNITY_PATH=""
+          # CodeMagic installs Unity automatically, so use the standard path
+          UNITY_VERSION="6000.2.15f1"
+          UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
           
-          # Check Unity Hub location first (most common)
-          if [ -f "/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity" ]; then
-            UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
-            echo "Found Unity in Hub location"
-          # Check for direct Unity installation
-          elif [ -f "/Applications/Unity/Unity.app/Contents/MacOS/Unity" ]; then
-            UNITY_PATH="/Applications/Unity/Unity.app/Contents/MacOS/Unity"
-            echo "Found Unity in direct installation location"
-          # Try to find Unity anywhere in /Applications
+          # Verify Unity exists (CodeMagic should have installed it)
+          if [ ! -f "$UNITY_PATH" ]; then
+            echo "⚠️  Unity not found at standard path, searching..."
+            UNITY_PATH=$(find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+            if [ -z "$UNITY_PATH" ] || [ ! -f "$UNITY_PATH" ]; then
+              echo "❌ Error: Unity executable not found!"
+              echo "CodeMagic should have installed Unity ${UNITY_VERSION} automatically."
+              echo "Check that 'unity: 6000.2.15f1' is set in the environment section."
+              exit 1
+            fi
+            echo "✅ Found Unity at: $UNITY_PATH"
           else
-            echo "Searching for Unity in /Applications..."
-            UNITY_PATH=$(find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
-            if [ -n "$UNITY_PATH" ]; then
-              echo "Found Unity at: $UNITY_PATH"
-            fi
+            echo "✅ Using Unity at: $UNITY_PATH"
           fi
-          
-          # If still not found, try to use any Unity version
-          if [ -z "$UNITY_PATH" ]; then
-            echo "⚠️  Unity ${UNITY_VERSION} not found, searching for any Unity version..."
-            UNITY_PATH=$(find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
-            if [ -n "$UNITY_PATH" ]; then
-              echo "⚠️  Using different Unity version found at: $UNITY_PATH"
-            fi
-          fi
-          
-          # Final check
-          if [ -z "$UNITY_PATH" ] || [ ! -f "$UNITY_PATH" ]; then
-            echo "❌ Error: Unity executable not found!"
-            echo "Searched locations:"
-            echo "  - /Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
-            echo "  - /Applications/Unity/Unity.app/Contents/MacOS/Unity"
-            echo ""
-            echo "Please check the Unity installation step above for errors."
-            exit 1
-          fi
-          
-          echo "✅ Using Unity at: $UNITY_PATH"
-          
-          # Verify Unity version (optional check)
-          UNITY_ACTUAL_VERSION=$("$UNITY_PATH" -version 2>&1 | head -1 || echo "unknown")
-          echo "Unity version: $UNITY_ACTUAL_VERSION"
           
           # Build Unity project for iOS
           # For Personal license, we don't use -serial parameter
