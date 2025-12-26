@@ -23,9 +23,9 @@ workflows:
     instance_type: mac_mini_m1
     environment:
       # Unity version - check https://docs.codemagic.io/knowledge-others/install-unity-version/ for supported versions
-      # Common supported versions: 2021.3.47f1, 2022.3.20f1, 2022.3.62f2
-      # If this version fails, try: 2021.3.47f1 (very common LTS version)
-      unity: 2021.3.47f1  # Try this common LTS version first
+      # This project uses Unity 6000.2.15f1 (Unity 6)
+      # Unity 6 LTS versions newer than 6000.0.37f1 are automatically supported
+      unity: 6000.2.15f1  # Unity 6 version used by this project
       vars:
         # Unity account credentials - REPLACE WITH YOUR ACTUAL VALUES
         # ⚠️ WARNING: These will be visible in your Git repository!
@@ -51,7 +51,7 @@ workflows:
           echo "Checking Unity installation..."
           
           # CodeMagic installs Unity to standard location
-          UNITY_VERSION="2021.3.47f1"
+          UNITY_VERSION="6000.2.15f1"
           UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
           
           if [ -f "$UNITY_PATH" ]; then
@@ -79,7 +79,7 @@ workflows:
           set -e
           
           # CodeMagic installs Unity automatically, so use the standard path
-          UNITY_VERSION="2021.3.47f1"
+          UNITY_VERSION="6000.2.15f1"
           UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
           
           # Verify Unity exists (CodeMagic should have installed it)
