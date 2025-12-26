@@ -22,9 +22,11 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m1
     environment:
-      # CodeMagic automatically installs Unity when you specify the version here
-      unity: 6000.2.15f1
+      # Note: Unity 6 (6000.x) is not supported via CodeMagic's automatic installation
+      # We'll install it manually in the scripts section
+      # unity: 6000.2.15f1  # Not supported - installing manually instead
       vars:
+        UNITY_VERSION: "6000.2.15f1"
         # Unity account credentials - REPLACE WITH YOUR ACTUAL VALUES
         # ⚠️ WARNING: These will be visible in your Git repository!
         UNITY_EMAIL: "amohamad343@gmail.com"  # Your Gmail address
@@ -40,32 +42,101 @@ workflows:
       cocoapods: default
       
     scripts:
-      - name: Verify Unity Installation
+      - name: Install Unity 6
         script: |
           echo "=========================================="
-          echo "Verifying Unity installation..."
+          echo "Installing Unity ${UNITY_VERSION}..."
           echo "=========================================="
+          echo "Note: Unity 6 is not supported via CodeMagic's automatic installation"
+          echo "Installing manually using Unity Hub..."
           
-          # CodeMagic automatically installs Unity when you specify unity: in environment
-          # Check if Unity is available at the standard CodeMagic path
-          UNITY_VERSION="6000.2.15f1"
+          # Check if Unity is already installed
           UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
-          
           if [ -f "$UNITY_PATH" ]; then
-            echo "✅ Unity ${UNITY_VERSION} found at: $UNITY_PATH"
-            "$UNITY_PATH" -version || echo "Could not get Unity version"
-          else
-            echo "⚠️  Unity not found at expected path, searching..."
-            # Try to find Unity anywhere
-            FOUND_UNITY=$(find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
-            if [ -n "$FOUND_UNITY" ]; then
-              echo "✅ Found Unity at: $FOUND_UNITY"
-              UNITY_PATH="$FOUND_UNITY"
-            else
-              echo "❌ Unity not found. CodeMagic should install it automatically."
-              echo "Check that unity: 6000.2.15f1 is set in environment section."
+            echo "✅ Unity ${UNITY_VERSION} is already installed"
+            exit 0
+          fi
+          
+          # Install Unity Hub if not present
+          if [ ! -d "/Applications/Unity Hub.app" ]; then
+            echo "Installing Unity Hub..."
+            curl -L -o /tmp/UnityHub.dmg "https://public-cdn.cloud.unity3d.com/hub/prod/UnityHub.dmg" || {
+              echo "❌ Failed to download Unity Hub"
               exit 1
+            }
+            
+            hdiutil attach /tmp/UnityHub.dmg -quiet
+            sudo cp -R "/Volumes/Unity Hub/Unity Hub.app" /Applications/
+            hdiutil detach "/Volumes/Unity Hub" -quiet
+            rm /tmp/UnityHub.dmg
+            echo "✅ Unity Hub installed"
+          else
+            echo "✅ Unity Hub already installed"
+          fi
+          
+          # Install Unity using Unity Hub CLI
+          # Unity Hub CLI method (if available)
+          if [ -f "/Applications/Unity Hub.app/Contents/MacOS/Unity Hub" ]; then
+            echo "Attempting to install Unity via Unity Hub..."
+            # Note: Unity Hub CLI installation may require manual setup
+            # Alternative: Download Unity directly
+          fi
+          
+          # Download Unity directly from Unity
+          echo "Downloading Unity ${UNITY_VERSION} directly..."
+          
+          # Unity 6 uses different download URLs - try multiple formats
+          UNITY_URLS=(
+            # Standard format
+            "https://download.unity3d.com/download_unity/${UNITY_VERSION}/MacEditorInstaller/Unity-${UNITY_VERSION}.pkg"
+            # Alternative format
+            "https://beta.unity3d.com/download/${UNITY_VERSION}/MacEditorInstaller/Unity-${UNITY_VERSION}.pkg"
+            # Unity 6 specific format
+            "https://download.unity3d.com/download_unity/${UNITY_VERSION}/MacEditorInstaller/Unity.pkg"
+            # Unity Hub API format (if available)
+            "https://public-cdn.cloud.unity3d.com/hub/prod/UnityHub.dmg"
+          )
+          
+          DOWNLOADED=false
+          for URL in "${UNITY_URLS[@]}"; do
+            echo "Trying: $URL"
+            if curl -L -f -o /tmp/unity.pkg "$URL" 2>/dev/null; then
+              echo "✅ Download successful"
+              DOWNLOADED=true
+              break
             fi
+          done
+          
+          if [ "$DOWNLOADED" = false ]; then
+            echo "❌ Failed to download Unity ${UNITY_VERSION}"
+            echo ""
+            echo "Unity 6 may not be available for direct download."
+            echo "Options:"
+            echo "1. Use a supported Unity version (2022.3.x or 2021.3.x)"
+            echo "2. Download Unity manually and upload to CodeMagic"
+            echo "3. Contact CodeMagic support for Unity 6 support"
+            exit 1
+          fi
+          
+          # Install Unity
+          echo "Installing Unity package..."
+          sudo installer -pkg /tmp/unity.pkg -target / -allowUntrusted || {
+            echo "❌ Installation failed"
+            exit 1
+          }
+          
+          # Clean up
+          rm -f /tmp/unity.pkg
+          
+          # Verify installation
+          sleep 3
+          if [ -f "$UNITY_PATH" ]; then
+            echo "✅ Unity ${UNITY_VERSION} installed successfully"
+            "$UNITY_PATH" -version || echo "Could not verify version"
+          else
+            echo "⚠️  Unity installed but not found at expected path"
+            echo "Searching for Unity..."
+            find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -3
           fi
           
       - name: Build Unity Project for iOS
@@ -77,18 +148,17 @@ workflows:
           
           set -e
           
-          # CodeMagic installs Unity automatically, so use the standard path
-          UNITY_VERSION="6000.2.15f1"
+          # Unity should be installed by previous step
           UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity/Unity.app/Contents/MacOS/Unity"
           
-          # Verify Unity exists (CodeMagic should have installed it)
+          # Verify Unity exists
           if [ ! -f "$UNITY_PATH" ]; then
             echo "⚠️  Unity not found at standard path, searching..."
             UNITY_PATH=$(find /Applications -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
             if [ -z "$UNITY_PATH" ] || [ ! -f "$UNITY_PATH" ]; then
               echo "❌ Error: Unity executable not found!"
-              echo "CodeMagic should have installed Unity ${UNITY_VERSION} automatically."
-              echo "Check that 'unity: 6000.2.15f1' is set in the environment section."
+              echo "Unity ${UNITY_VERSION} should have been installed in the previous step."
+              echo "Check the 'Install Unity 6' step logs for errors."
               exit 1
             fi
             echo "✅ Found Unity at: $UNITY_PATH"
