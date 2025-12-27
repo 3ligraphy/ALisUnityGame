@@ -393,9 +393,8 @@ workflows:
           success: true
           failure: true
       app_store_connect:
-        # Uncomment and configure these when ready for automatic TestFlight uploads
-        # You'll need to set up App Store Connect API keys in CodeMagic first
-        # auth: integration
-        # submit_to_testflight: true
-        # beta_groups:
+        # Automatic TestFlight uploads using your CodeMagic Apple Developer integration
+        auth: integration  # Uses the integration you set up in CodeMagic UI
+        submit_to_testflight: true
+        # beta_groups:  # Uncomment to distribute to specific beta groups
         #   - Internal Testers

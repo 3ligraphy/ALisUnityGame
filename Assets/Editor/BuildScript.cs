@@ -31,7 +31,31 @@ public class BuildScript
         Debug.Log($"Product Name: {PlayerSettings.productName}");
         Debug.Log($"Bundle Version: {PlayerSettings.bundleVersion}");
 
-        // Configure iOS build settings
+    // Set app icon automatically
+    string iconPath = "Assets/AppIcon.png";
+    if (System.IO.File.Exists(iconPath))
+    {
+        Debug.Log($"Setting app icon from: {iconPath}");
+        Texture2D icon = AssetDatabase.LoadAssetAtPath<Texture2D>(iconPath);
+        if (icon != null)
+        {
+            // Set default icon for all platforms
+            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.Unknown, new Texture2D[] { icon });
+            // Set iOS specific icons
+            PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.iOS, new Texture2D[] { icon });
+            Debug.Log("✅ App icon set successfully");
+        }
+        else
+        {
+            Debug.LogWarning("⚠️ Could not load app icon from Assets/AppIcon.png");
+        }
+    }
+    else
+    {
+        Debug.LogWarning("⚠️ App icon not found at Assets/AppIcon.png - using default");
+    }
+
+    // Configure iOS build settings
         PlayerSettings.iOS.buildNumber = Environment.GetEnvironmentVariable("BUILD_NUMBER") ?? "1";
         
         // Set bundle identifier if provided via environment
