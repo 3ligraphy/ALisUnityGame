@@ -43,6 +43,9 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.failaka.games.adventure
+      
+      integrations:
+        app_store_connect: Code Magic illusionaire  # Uses your CodeMagic Apple Developer integration
     
     cache:
       cache_paths:
