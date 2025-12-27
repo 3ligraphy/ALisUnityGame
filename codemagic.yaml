@@ -40,6 +40,9 @@ workflows:
         
       xcode: latest
       cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.failaka.games.adventure
     
     cache:
       cache_paths:
@@ -218,30 +221,6 @@ workflows:
           else
             echo "⚠️  Build log not found, but continuing..."
           fi
-          
-      - name: Initialize keychain
-        script: |
-          echo "=========================================="
-          echo "Initializing keychain for code signing..."
-          echo "=========================================="
-          keychain initialize
-          echo "✅ Keychain initialized"
-      
-      - name: Fetch signing files
-        script: |
-          echo "=========================================="
-          echo "Fetching signing files from App Store Connect..."
-          echo "=========================================="
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE
-          echo "✅ Signing files fetched"
-      
-      - name: Add certificates to keychain
-        script: |
-          echo "=========================================="
-          echo "Adding certificates to keychain..."
-          echo "=========================================="
-          keychain add-certificates
-          echo "✅ Certificates added to keychain"
       
       - name: Configure Xcode Project
         script: |
