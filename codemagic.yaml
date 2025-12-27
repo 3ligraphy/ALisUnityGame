@@ -21,6 +21,8 @@ workflows:
     name: iOS Workflow
     max_build_duration: 120
     instance_type: mac_mini_m1
+    integrations:
+      app_store_connect: Code Magic illusionaire  # Uses your CodeMagic Apple Developer integration
     environment:
       # Base Unity version for license activation (must be a supported version)
       # This Unity is used ONLY to activate the license
@@ -43,9 +45,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.failaka.games.adventure
-      
-      integrations:
-        app_store_connect: Code Magic illusionaire  # Uses your CodeMagic Apple Developer integration
     
     cache:
       cache_paths:
