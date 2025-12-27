@@ -267,9 +267,9 @@ workflows:
             /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${BUNDLE_ID}" "$INFO_PLIST" 2>/dev/null || \
             echo "⚠️  Could not set bundle identifier"
             
-            # Set version
-            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.0" "$INFO_PLIST" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.0" "$INFO_PLIST" 2>/dev/null || \
+            # Set version (increment from 1.0 already in App Store Connect)
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.1" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.1" "$INFO_PLIST" 2>/dev/null || \
             echo "⚠️  Could not set version"
             
             # Set build number (MUST exist for App Store Connect)

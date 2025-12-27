@@ -31,6 +31,14 @@ public class BuildScript
         Debug.Log($"Product Name: {PlayerSettings.productName}");
         Debug.Log($"Bundle Version: {PlayerSettings.bundleVersion}");
 
+        // Configure company and product names for App Store compliance
+        PlayerSettings.companyName = "Failaka Games";
+        PlayerSettings.productName = "Failaka Island Adventure";
+        PlayerSettings.bundleVersion = "1.0.1";  // Increment from 1.0 already in App Store Connect
+        Debug.Log("✅ Set company: Failaka Games");
+        Debug.Log("✅ Set product: Failaka Island Adventure");
+        Debug.Log("✅ Set version: 1.0.1");
+
     // Set app icon automatically
     string iconPath = "Assets/AppIcon.png";
     if (System.IO.File.Exists(iconPath))
