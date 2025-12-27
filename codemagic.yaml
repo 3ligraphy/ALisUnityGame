@@ -258,6 +258,10 @@ workflows:
           else
             echo "Updating Info.plist: $INFO_PLIST"
             
+            # Set build number with fallback (CRITICAL for App Store Connect)
+            BUILD_NUM="${CM_BUILD_NUMBER:-${BUILD_NUMBER:-1}}"
+            echo "Setting build number to: $BUILD_NUM"
+            
             # Set bundle identifier
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" "$INFO_PLIST" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${BUNDLE_ID}" "$INFO_PLIST" 2>/dev/null || \
@@ -268,10 +272,20 @@ workflows:
             /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.0" "$INFO_PLIST" 2>/dev/null || \
             echo "⚠️  Could not set version"
             
-            # Set build number (uses CodeMagic build number)
-            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${CM_BUILD_NUMBER}" "$INFO_PLIST" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${CM_BUILD_NUMBER}" "$INFO_PLIST" 2>/dev/null || \
-            echo "⚠️  Could not set build number"
+            # Set build number (MUST exist for App Store Connect)
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUM" "$INFO_PLIST" 2>/dev/null || {
+              echo "❌ ERROR: Failed to set CFBundleVersion!"
+              exit 1
+            }
+            
+            # Verify CFBundleVersion was set
+            VERIFY_BUILD_NUM=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST" 2>/dev/null)
+            if [ -z "$VERIFY_BUILD_NUM" ]; then
+              echo "❌ ERROR: CFBundleVersion is still empty after setting!"
+              exit 1
+            fi
+            echo "✅ CFBundleVersion set to: $VERIFY_BUILD_NUM"
             
             # Set minimum iOS version
             /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 13.0" "$INFO_PLIST" 2>/dev/null || \
