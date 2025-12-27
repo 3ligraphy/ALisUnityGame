@@ -34,7 +34,7 @@ public class BuildScript
         // Configure company and product names for App Store compliance
         PlayerSettings.companyName = "Failaka Games";
         PlayerSettings.productName = "Failaka Island";
-        PlayerSettings.bundleVersion = "1.0.2";  // Resubmission after rejection
+        PlayerSettings.bundleVersion = "1.0.3";  // Third submission - all popups fixed
         Debug.Log("✅ Set company: Failaka Games");
         Debug.Log("✅ Set product: Failaka Island");
         Debug.Log("✅ Set version: 1.0.2");
