@@ -34,10 +34,10 @@ public class BuildScript
         // Configure company and product names for App Store compliance
         PlayerSettings.companyName = "Failaka Games";
         PlayerSettings.productName = "Failaka Island";
-        PlayerSettings.bundleVersion = "1.0.3";  // Third submission - all popups fixed
+        PlayerSettings.bundleVersion = "1.0.4";  // Fourth submission - Gate button sizes fixed
         Debug.Log("✅ Set company: Failaka Games");
         Debug.Log("✅ Set product: Failaka Island");
-        Debug.Log("✅ Set version: 1.0.2");
+        Debug.Log("✅ Set version: 1.0.4");
 
     // Set app icon automatically
     string iconPath = "Assets/AppIcon.png";

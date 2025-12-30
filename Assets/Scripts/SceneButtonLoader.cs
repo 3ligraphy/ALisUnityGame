@@ -21,6 +21,6 @@ public class SceneButtonLoader : MonoBehaviour
 
     void LoadTargetScene()
     {
-        SceneManager.LoadScene(targetSceneIndex);
+        SceneManager.LoadSceneAsync(targetSceneIndex);
     }
 }

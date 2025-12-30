@@ -125,6 +125,6 @@ public class SlideShowController : MonoBehaviour
 
     void StartGame()
     {
-        SceneManager.LoadScene("Map");
+        SceneManager.LoadSceneAsync("Map");
     }
 }

@@ -11,8 +11,8 @@ public class AndroidBuildScript
         EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android);
 
         // Configure Android settings
-        PlayerSettings.Android.bundleVersionCode = 3; // Increment for each build
-        PlayerSettings.bundleVersion = "1.0.3";
+        PlayerSettings.Android.bundleVersionCode = 4; // Increment for each build
+        PlayerSettings.bundleVersion = "1.0.4";
         PlayerSettings.productName = "Failaka Island";
         PlayerSettings.companyName = "Failaka Games";
         PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, "com.failaka.games.adventure");

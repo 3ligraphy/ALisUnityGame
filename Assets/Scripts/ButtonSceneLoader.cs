@@ -16,8 +16,8 @@ public class ButtonSceneLoader : MonoBehaviour
         // التحقق من أن فهرس المشهد ضمن النطاق المسموح به
         if (targetSceneIndex >= 0 && targetSceneIndex < SceneManager.sceneCountInBuildSettings)
         {
-            // تحميل المشهد باستخدام فهرسه (الرقم)
-            SceneManager.LoadScene(targetSceneIndex);
+            // تحميل المشهد باستخدام فهرسه (الرقم) - Async to prevent freeze
+            SceneManager.LoadSceneAsync(targetSceneIndex);
         }
         else
         {

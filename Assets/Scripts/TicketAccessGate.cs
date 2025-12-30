@@ -35,14 +35,14 @@ public class TicketAccessGate : MonoBehaviour
 
         if (enteredCode.Equals(correctCode, System.StringComparison.OrdinalIgnoreCase))
         {
-            feedbackText.text = "✅ Verified! Welcome.";
-            popupPanel.SetActive(false);
-
+            feedbackText.text = "✅ Verified! Loading...";
+            
             if (gateBlocker != null)
                 gateBlocker.SetActive(false); // يفتح الباب أو يزيل الحاجز
 
-            // الانتقال إلى المشهد المحدد
-            SceneManager.LoadScene(targetSceneIndex);
+            // Load scene asynchronously (prevents freeze on mobile)
+            // No coroutine needed - LoadSceneAsync works by itself
+            SceneManager.LoadSceneAsync(targetSceneIndex);
         }
         else
         {

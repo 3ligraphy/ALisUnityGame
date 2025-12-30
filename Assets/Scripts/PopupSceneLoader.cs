@@ -44,6 +44,6 @@ public class PopupSceneLoader : MonoBehaviour
 
     void LoadTargetScene()
     {
-        SceneManager.LoadScene(targetSceneIndex);
+        SceneManager.LoadSceneAsync(targetSceneIndex);
     }
 }

@@ -44,7 +44,7 @@ public class PopupManager : MonoBehaviour
     {
         if (targetSceneIndex >= 0)
         {
-            SceneManager.LoadScene(targetSceneIndex);
+            SceneManager.LoadSceneAsync(targetSceneIndex);
         }
         else
         {
