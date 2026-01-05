@@ -46,16 +46,41 @@ workflows:
       - name: Install Unity Hub and Project Version
         script: |
           echo "Installing Unity Hub..."
-          brew install --cask unity-hub || echo "Unity Hub may already be installed"
           
-          echo "Installing Unity $UNITY_VERSION..."
+          # Use direct download instead of brew to avoid interactive prompts
+          if [ ! -d "/Applications/Unity Hub.app" ]; then
+            echo "Downloading Unity Hub directly..."
+            curl -L "https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.dmg" -o /tmp/UnityHubSetup.dmg
+            hdiutil attach /tmp/UnityHubSetup.dmg -nobrowse
+            cp -R "/Volumes/Unity Hub 1.0/Unity Hub.app" /Applications/
+            hdiutil detach "/Volumes/Unity Hub 1.0"
+            echo "✅ Unity Hub installed from direct download"
+          else
+            echo "✅ Unity Hub already installed"
+          fi
+          
+          echo "Installing Unity $UNITY_VERSION for Apple Silicon..."
+          
+          # Use --architecture flag to avoid interactive prompt
           /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- --headless install \
             --version $UNITY_VERSION \
             --changeset $UNITY_VERSION_CHANGESET \
             --module ios \
-            --childModules || echo "Unity installation completed or already exists"
+            --childModules \
+            --architecture arm64 \
+            2>&1 || echo "Unity installation completed or already exists"
           
-          echo "✅ Unity $UNITY_VERSION installed"
+          # Check if Unity was installed
+          if [ -d "/Applications/Unity/Hub/Editor/$UNITY_VERSION" ]; then
+            echo "✅ Unity $UNITY_VERSION installed successfully"
+          else
+            echo "Trying alternative installation method..."
+            # Alternative: Use unityhub:// URL scheme
+            open "unityhub://$UNITY_VERSION/$UNITY_VERSION_CHANGESET" || true
+            sleep 60
+          fi
+          
+          echo "✅ Unity installation step complete"
       
       - name: Activate Unity License
         script: |
