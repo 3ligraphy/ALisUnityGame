@@ -138,4 +138,74 @@ public class BuildScript
         
         return scenes.ToArray();
     }
+
+    /// <summary>
+    /// Build iOS app for SIMULATOR testing (not for App Store)
+    /// Usage: Unity -quit -batchmode -executeMethod BuildScript.BuildIOSSimulator
+    /// </summary>
+    public static void BuildIOSSimulator()
+    {
+        Debug.Log("========================================");
+        Debug.Log("Starting iOS SIMULATOR build...");
+        Debug.Log("========================================");
+
+        // Build path for simulator
+        string buildPath = "build/ios_simulator";
+        Debug.Log($"Simulator build path: {buildPath}");
+
+        // Configure for Simulator SDK
+        PlayerSettings.iOS.sdkVersion = iOSSdkVersion.SimulatorSDK;
+        Debug.Log("✅ Set SDK to SimulatorSDK");
+
+        // Configure company and product names
+        PlayerSettings.companyName = "Failaka Games";
+        PlayerSettings.productName = "Failaka Island";
+        PlayerSettings.bundleVersion = "1.0.5";
+        
+        // Set bundle identifier
+        string bundleId = Environment.GetEnvironmentVariable("BUNDLE_ID");
+        if (!string.IsNullOrEmpty(bundleId))
+        {
+            PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.iOS, bundleId);
+        }
+
+        // Get all enabled scenes
+        string[] scenes = GetEnabledScenes();
+        Debug.Log($"Building {scenes.Length} scenes for simulator");
+
+        // Configure build options for simulator
+        BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions
+        {
+            scenes = scenes,
+            locationPathName = buildPath,
+            target = BuildTarget.iOS,
+            options = BuildOptions.Development  // Development build for simulator
+        };
+
+        // Perform the build
+        Debug.Log("Starting simulator build...");
+        UnityEditor.Build.Reporting.BuildReport report = BuildPipeline.BuildPlayer(buildPlayerOptions);
+        UnityEditor.Build.Reporting.BuildSummary summary = report.summary;
+
+        // Reset SDK back to Device for future builds
+        PlayerSettings.iOS.sdkVersion = iOSSdkVersion.DeviceSDK;
+
+        Debug.Log("========================================");
+        if (summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded)
+        {
+            Debug.Log($"✅ Simulator build succeeded!");
+            Debug.Log($"Build time: {summary.totalTime}");
+            Debug.Log($"Output path: {summary.outputPath}");
+            Debug.Log("========================================");
+            EditorApplication.Exit(0);
+        }
+        else
+        {
+            Debug.LogError($"❌ Simulator build failed!");
+            Debug.LogError($"Result: {summary.result}");
+            Debug.LogError($"Total errors: {summary.totalErrors}");
+            Debug.Log("========================================");
+            EditorApplication.Exit(1);
+        }
+    }
 }
