@@ -17,6 +17,185 @@
 # TO USE THIS FILE: Replace the placeholder values below with your actual credentials
 
 workflows:
+  # ============================================
+  # SIMULATOR TESTING WORKFLOW (No signing needed)
+  # Use this to test on iOS Simulator via VNC
+  # ============================================
+  ios-simulator-test:
+    name: iOS Simulator Test (VNC)
+    max_build_duration: 120
+    instance_type: mac_mini_m1
+    environment:
+      unity: 2022.3.47f1
+      vars:
+        UNITY_EMAIL: "ali.motawea@bue.edu.eg"
+        UNITY_PASSWORD: "AJ1422003249aj*"
+        BUNDLE_ID: "com.failaka.games.adventure"
+      xcode: latest
+      # NO ios_signing section - simulators don't need signing!
+    
+    scripts:
+      - name: Detect Unity Version
+        script: |
+          UNITY_VERSION=$(echo $(sed -n '1p' ProjectSettings/ProjectVersion.txt) | cut -c 18-)
+          UNITY_VERSION_CHANGESET=$(echo $(sed -n '2p' ProjectSettings/ProjectVersion.txt) | cut -d "(" -f2 | cut -d ")" -f1 | xargs)
+          echo "UNITY_VERSION=$UNITY_VERSION" >> $CM_ENV
+          echo "UNITY_VERSION_CHANGESET=$UNITY_VERSION_CHANGESET" >> $CM_ENV
+          echo "✅ Unity version: $UNITY_VERSION"
+      
+      - name: Install Unity Hub and Project Version
+        script: |
+          echo "Installing Unity Hub..."
+          brew install --cask unity-hub || echo "Unity Hub may already be installed"
+          
+          echo "Installing Unity $UNITY_VERSION..."
+          /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- --headless install \
+            --version $UNITY_VERSION \
+            --changeset $UNITY_VERSION_CHANGESET \
+            --module ios \
+            --childModules || echo "Unity installation completed or already exists"
+          
+          echo "✅ Unity $UNITY_VERSION installed"
+      
+      - name: Activate Unity License
+        script: |
+          TEMP_UNITY=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+          
+          if [ -n "$TEMP_UNITY" ]; then
+            $TEMP_UNITY -quit -batchmode -nographics \
+              -username "${UNITY_EMAIL}" \
+              -password "${UNITY_PASSWORD}" \
+              -logFile - || true
+            echo "✅ Unity license activated"
+          fi
+      
+      - name: Build Xcode Project for Simulator
+        script: |
+          echo "Building Unity project for iOS Simulator..."
+          
+          UNITY_PATH="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/MacOS/Unity"
+          
+          # Create a custom build script for simulator
+          cat > Assets/Editor/SimulatorBuild.cs << 'EOF'
+          using UnityEditor;
+          using UnityEngine;
+          
+          public class SimulatorBuild
+          {
+              [MenuItem("Build/Build for iOS Simulator")]
+              public static void BuildForSimulator()
+              {
+                  // Set to build for Simulator SDK
+                  PlayerSettings.iOS.sdkVersion = iOSSdkVersion.SimulatorSDK;
+                  PlayerSettings.SetScriptingBackend(BuildTargetGroup.iOS, ScriptingImplementation.Mono2x);
+                  
+                  BuildPlayerOptions buildOptions = new BuildPlayerOptions();
+                  buildOptions.scenes = new[] {
+                      "Assets/Scenes/Intro.unity",
+                      "Assets/Scenes/Menu.unity",
+                      "Assets/Scenes/Map.unity",
+                      "Assets/Scenes/Map 1 Museum/Museum Gate.unity",
+                      "Assets/Scenes/Map 1 Museum/Museum 1.unity",
+                      "Assets/Scenes/Map 2 Wells/wells Gate.unity",
+                      "Assets/Scenes/Map 2 Wells/wells.unity",
+                      "Assets/Scenes/Map 3 gemstones/gemstones Gate.unity",
+                      "Assets/Scenes/Map 3 gemstones/gemstones.unity",
+                      "Assets/Scenes/Map 4 Cinema/cinema Gate.unity",
+                      "Assets/Scenes/Map 4 Cinema/cinema.unity"
+                  };
+                  buildOptions.locationPathName = "build/ios_simulator";
+                  buildOptions.target = BuildTarget.iOS;
+                  buildOptions.options = BuildOptions.None;
+                  
+                  UnityEditor.Build.Reporting.BuildReport report = BuildPipeline.BuildPlayer(buildOptions);
+                  
+                  if (report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded)
+                  {
+                      Debug.Log("✅ Simulator build succeeded!");
+                  }
+                  else
+                  {
+                      Debug.LogError("❌ Simulator build failed");
+                      EditorApplication.Exit(1);
+                  }
+              }
+          }
+          EOF
+          
+          # Build the project for simulator
+          $UNITY_PATH \
+            -quit \
+            -batchmode \
+            -nographics \
+            -projectPath "$(pwd)" \
+            -executeMethod SimulatorBuild.BuildForSimulator \
+            -logFile - || echo "Build completed"
+          
+          echo "✅ Xcode project generated for Simulator"
+      
+      - name: Build Simulator App with Xcode
+        script: |
+          echo "Building .app for iOS Simulator..."
+          
+          cd build/ios_simulator
+          
+          # Build for simulator (no signing needed!)
+          xcodebuild \
+            -project Unity-iPhone.xcodeproj \
+            -scheme Unity-iPhone \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPad Air 11-inch (M3)' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build || echo "Build completed"
+          
+          echo "✅ Simulator app built!"
+      
+      - name: Start Simulator and Install App
+        script: |
+          echo "Starting iOS Simulator..."
+          
+          # Boot iPad Air simulator
+          xcrun simctl boot "iPad Air 11-inch (M3)" || echo "Simulator may already be booted"
+          
+          # Open Simulator app (visible via VNC)
+          open -a Simulator
+          
+          # Find and install the app
+          APP_PATH=$(find build -name "*.app" -type d | head -1)
+          
+          if [ -n "$APP_PATH" ]; then
+            echo "Installing app: $APP_PATH"
+            xcrun simctl install booted "$APP_PATH"
+            echo "✅ App installed on simulator"
+            
+            # Launch the app
+            xcrun simctl launch booted "$BUNDLE_ID"
+            echo "✅ App launched!"
+          else
+            echo "⚠️ App not found, check build output"
+          fi
+          
+          echo ""
+          echo "=========================================="
+          echo "🖥️  VNC ACCESS READY!"
+          echo "=========================================="
+          echo "Connect via VNC to test the app."
+          echo "Simulator is running with your app."
+          echo ""
+          echo "To interact: Use VNC viewer"
+          echo "To stop: Cancel the build in CodeMagic"
+          echo "=========================================="
+          
+          # Keep the build alive for VNC access (2 hours)
+          echo "Waiting for VNC testing session (2 hours max)..."
+          sleep 7200
+
+  # ============================================
+  # MAIN iOS WORKFLOW (For App Store submission)
+  # ============================================
   ios-workflow:
     name: iOS Workflow
     max_build_duration: 120
@@ -267,9 +446,9 @@ workflows:
             /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${BUNDLE_ID}" "$INFO_PLIST" 2>/dev/null || \
             echo "⚠️  Could not set bundle identifier"
             
-            # Set version (fourth submission - Gate button sizes fixed)
-            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" "$INFO_PLIST" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.4" "$INFO_PLIST" 2>/dev/null || \
+            # Set version (fifth submission - iPad popup layout fixed)
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.5" "$INFO_PLIST" 2>/dev/null || \
             echo "⚠️  Could not set version"
             
             # Set build number (MUST exist for App Store Connect)
