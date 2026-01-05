@@ -561,6 +561,84 @@ workflows:
             echo "Skipping CocoaPods installation"
           fi
           
+      - name: Build and Run on Simulator for Testing
+        script: |
+          echo "=========================================="
+          echo "🧪 BUILDING FOR iOS SIMULATOR TESTING"
+          echo "=========================================="
+          
+          cd "$CM_BUILD_DIR/build/ios"
+          
+          # Build for simulator (no signing needed!)
+          echo "Building for iOS Simulator..."
+          xcodebuild \
+            -project Unity-iPhone.xcodeproj \
+            -scheme Unity-iPhone \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath simulator_build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tail -50
+          
+          # Find the built app
+          APP_PATH=$(find simulator_build -name "*.app" -type d | head -1)
+          
+          if [ -n "$APP_PATH" ]; then
+            echo "✅ Simulator build successful: $APP_PATH"
+            
+            # List available simulators
+            echo ""
+            echo "Available iPad simulators:"
+            xcrun simctl list devices available | grep -i "ipad" | head -5
+            
+            # Boot iPad Air simulator
+            echo "Booting iPad Air 11-inch simulator..."
+            xcrun simctl boot "iPad Air 11-inch (M3)" 2>/dev/null || \
+            xcrun simctl boot "iPad Air (5th generation)" 2>/dev/null || \
+            xcrun simctl boot $(xcrun simctl list devices available | grep -i "ipad" | head -1 | sed 's/.*(\([^)]*\)).*/\1/') 2>/dev/null || \
+            echo "Using default booted simulator"
+            
+            # Open Simulator app (visible via VNC)
+            open -a Simulator
+            sleep 5
+            
+            # Install and launch the app
+            echo "Installing app on simulator..."
+            xcrun simctl install booted "$APP_PATH"
+            
+            echo "Launching app..."
+            xcrun simctl launch booted "${BUNDLE_ID}"
+            
+            echo ""
+            echo "=========================================="
+            echo "🖥️  VNC TESTING READY!"
+            echo "=========================================="
+            echo "App is running on iPad simulator."
+            echo "Connect via VNC to test the app."
+            echo ""
+            echo "Testing window: 30 minutes"
+            echo "After testing, build will continue to IPA."
+            echo "=========================================="
+            
+            # Wait for testing (30 minutes)
+            echo ""
+            echo "⏱️  Waiting 30 minutes for VNC testing..."
+            echo "   (Build will auto-continue after 30 min)"
+            sleep 1800
+            
+            echo ""
+            echo "✅ Testing window complete. Continuing to IPA build..."
+            
+          else
+            echo "⚠️ Simulator build failed, skipping simulator test"
+            echo "Continuing with IPA build..."
+          fi
+          
+          # Clean up simulator build to save space
+          rm -rf simulator_build
+          
       - name: Build IPA
         script: |
           echo "=========================================="
