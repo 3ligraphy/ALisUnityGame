@@ -38,28 +38,45 @@ workflows:
       - name: Activate Unity License
         script: |
           echo "=========================================="
-          echo "Activating Unity 2022.3 License..."
+          echo "Activating Unity license..."
           echo "=========================================="
           
-          # Use CodeMagic's pre-installed Unity 2022.3
-          UNITY_PATH=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+          # Ensure license directory exists
+          mkdir -p "$HOME/Library/Application Support/Unity"
           
-          if [ -n "$UNITY_PATH" ]; then
-            echo "Using Unity at: $UNITY_PATH"
-            
-            # Activate license
-            $UNITY_PATH \
-              -quit \
-              -batchmode \
-              -nographics \
-              -username "${UNITY_EMAIL}" \
-              -password "${UNITY_PASSWORD}" \
-              -logFile - || true
-            
-            echo "✅ Unity license activated"
-          else
-            echo "❌ Unity not found"
+          # Use the pre-installed Unity from environment (2022.3.47f1)
+          TEMP_UNITY=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+          
+          if [ -z "$TEMP_UNITY" ]; then
+            echo "❌ No Unity installation found for license activation"
+            echo "Available Unity installations:"
+            ls -la /Applications/Unity/Hub/Editor/ 2>/dev/null || echo "No Unity Hub Editor directory found"
             exit 1
+          fi
+          
+          echo "Using Unity at: $TEMP_UNITY"
+          echo "Activating Unity Personal license with email: ${UNITY_EMAIL}"
+          
+          # Activate Unity license (Personal/Free license)
+          # For Personal license, use -serial flag without serial number
+          $TEMP_UNITY \
+            -quit \
+            -batchmode \
+            -nographics \
+            -serial \
+            -username "${UNITY_EMAIL}" \
+            -password "${UNITY_PASSWORD}" \
+            -logFile - || true
+          
+          # Wait a moment for license file to be created
+          sleep 3
+          
+          # Check if license was activated
+          if [ -f "$HOME/Library/Application Support/Unity/Unity_lic.ulf" ]; then
+            echo "✅ Unity license activated successfully"
+            echo "License file created at: $HOME/Library/Application Support/Unity/Unity_lic.ulf"
+          else
+            echo "⚠️ License file not found, but continuing (activation may have succeeded)"
           fi
       
       - name: Build Unity Project for Simulator
