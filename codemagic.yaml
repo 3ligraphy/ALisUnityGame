@@ -18,204 +18,163 @@
 
 workflows:
   # ============================================
-  # SIMULATOR TESTING WORKFLOW (No signing needed)
-  # Use this to test on iOS Simulator via VNC
+  # SIMULATOR TESTING WORKFLOW
+  # Uses Unity 2022.3 (CodeMagic pre-installed) for license compatibility
   # ============================================
   ios-simulator-test:
     name: iOS Simulator Test (VNC)
-    max_build_duration: 120
+    max_build_duration: 180
     instance_type: mac_mini_m1
     environment:
+      # Use CodeMagic's pre-installed Unity 2022.3 which works with Personal license
       unity: 2022.3.47f1
       vars:
         UNITY_EMAIL: "ali.motawea@bue.edu.eg"
         UNITY_PASSWORD: "AJ1422003249aj*"
         BUNDLE_ID: "com.failaka.games.adventure"
       xcode: latest
-      # NO ios_signing section - simulators don't need signing!
     
     scripts:
-      - name: Detect Unity Version
-        script: |
-          UNITY_VERSION=$(echo $(sed -n '1p' ProjectSettings/ProjectVersion.txt) | cut -c 18-)
-          UNITY_VERSION_CHANGESET=$(echo $(sed -n '2p' ProjectSettings/ProjectVersion.txt) | cut -d "(" -f2 | cut -d ")" -f1 | xargs)
-          echo "UNITY_VERSION=$UNITY_VERSION" >> $CM_ENV
-          echo "UNITY_VERSION_CHANGESET=$UNITY_VERSION_CHANGESET" >> $CM_ENV
-          echo "✅ Unity version: $UNITY_VERSION"
-      
-      - name: Install Unity Hub and Project Version
-        script: |
-          echo "Installing Unity Hub..."
-          
-          # Use direct download instead of brew to avoid interactive prompts
-          if [ ! -d "/Applications/Unity Hub.app" ]; then
-            echo "Downloading Unity Hub directly..."
-            curl -L "https://public-cdn.cloud.unity3d.com/hub/prod/UnityHubSetup.dmg" -o /tmp/UnityHubSetup.dmg
-            hdiutil attach /tmp/UnityHubSetup.dmg -nobrowse
-            cp -R "/Volumes/Unity Hub 1.0/Unity Hub.app" /Applications/
-            hdiutil detach "/Volumes/Unity Hub 1.0"
-            echo "✅ Unity Hub installed from direct download"
-          else
-            echo "✅ Unity Hub already installed"
-          fi
-          
-          echo "Installing Unity $UNITY_VERSION for Apple Silicon..."
-          
-          # Use --architecture flag to avoid interactive prompt
-          /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- --headless install \
-            --version $UNITY_VERSION \
-            --changeset $UNITY_VERSION_CHANGESET \
-            --module ios \
-            --childModules \
-            --architecture arm64 \
-            2>&1 || echo "Unity installation completed or already exists"
-          
-          # Check if Unity was installed
-          if [ -d "/Applications/Unity/Hub/Editor/$UNITY_VERSION" ]; then
-            echo "✅ Unity $UNITY_VERSION installed successfully"
-          else
-            echo "Trying alternative installation method..."
-            # Alternative: Use unityhub:// URL scheme
-            open "unityhub://$UNITY_VERSION/$UNITY_VERSION_CHANGESET" || true
-            sleep 60
-          fi
-          
-          echo "✅ Unity installation step complete"
-      
       - name: Activate Unity License
         script: |
-          TEMP_UNITY=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+          echo "=========================================="
+          echo "Activating Unity 2022.3 License..."
+          echo "=========================================="
           
-          if [ -n "$TEMP_UNITY" ]; then
-            $TEMP_UNITY -quit -batchmode -nographics \
+          # Use CodeMagic's pre-installed Unity 2022.3
+          UNITY_PATH=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+          
+          if [ -n "$UNITY_PATH" ]; then
+            echo "Using Unity at: $UNITY_PATH"
+            
+            # Activate license
+            $UNITY_PATH \
+              -quit \
+              -batchmode \
+              -nographics \
               -username "${UNITY_EMAIL}" \
               -password "${UNITY_PASSWORD}" \
               -logFile - || true
+            
             echo "✅ Unity license activated"
+          else
+            echo "❌ Unity not found"
+            exit 1
           fi
       
-      - name: Build Xcode Project for Simulator
+      - name: Build Unity Project for Simulator
         script: |
-          echo "Building Unity project for iOS Simulator..."
+          echo "=========================================="
+          echo "🧪 Building for iOS Simulator..."
+          echo "=========================================="
           
-          UNITY_PATH="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/MacOS/Unity"
+          # Use CodeMagic's pre-installed Unity
+          UNITY_PATH=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
           
-          # Create a custom build script for simulator
-          cat > Assets/Editor/SimulatorBuild.cs << 'EOF'
-          using UnityEditor;
-          using UnityEngine;
+          echo "Using Unity at: $UNITY_PATH"
           
-          public class SimulatorBuild
-          {
-              [MenuItem("Build/Build for iOS Simulator")]
-              public static void BuildForSimulator()
-              {
-                  // Set to build for Simulator SDK
-                  PlayerSettings.iOS.sdkVersion = iOSSdkVersion.SimulatorSDK;
-                  PlayerSettings.SetScriptingBackend(BuildTargetGroup.iOS, ScriptingImplementation.Mono2x);
-                  
-                  BuildPlayerOptions buildOptions = new BuildPlayerOptions();
-                  buildOptions.scenes = new[] {
-                      "Assets/Scenes/Intro.unity",
-                      "Assets/Scenes/Menu.unity",
-                      "Assets/Scenes/Map.unity",
-                      "Assets/Scenes/Map 1 Museum/Museum Gate.unity",
-                      "Assets/Scenes/Map 1 Museum/Museum 1.unity",
-                      "Assets/Scenes/Map 2 Wells/wells Gate.unity",
-                      "Assets/Scenes/Map 2 Wells/wells.unity",
-                      "Assets/Scenes/Map 3 gemstones/gemstones Gate.unity",
-                      "Assets/Scenes/Map 3 gemstones/gemstones.unity",
-                      "Assets/Scenes/Map 4 Cinema/cinema Gate.unity",
-                      "Assets/Scenes/Map 4 Cinema/cinema.unity"
-                  };
-                  buildOptions.locationPathName = "build/ios_simulator";
-                  buildOptions.target = BuildTarget.iOS;
-                  buildOptions.options = BuildOptions.None;
-                  
-                  UnityEditor.Build.Reporting.BuildReport report = BuildPipeline.BuildPlayer(buildOptions);
-                  
-                  if (report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded)
-                  {
-                      Debug.Log("✅ Simulator build succeeded!");
-                  }
-                  else
-                  {
-                      Debug.LogError("❌ Simulator build failed");
-                      EditorApplication.Exit(1);
-                  }
-              }
-          }
-          EOF
-          
-          # Build the project for simulator
+          # Build using our BuildIOSSimulator method
           $UNITY_PATH \
             -quit \
             -batchmode \
             -nographics \
             -projectPath "$(pwd)" \
-            -executeMethod SimulatorBuild.BuildForSimulator \
-            -logFile - || echo "Build completed"
+            -executeMethod BuildScript.BuildIOSSimulator \
+            -logFile "$(pwd)/simulator_build.log" || {
+              echo "Build may have encountered issues, checking..."
+              tail -50 "$(pwd)/simulator_build.log" 2>/dev/null || true
+            }
           
-          echo "✅ Xcode project generated for Simulator"
+          # Check if build succeeded
+          if [ -d "build/ios_simulator/Unity-iPhone.xcodeproj" ]; then
+            echo "✅ Unity simulator build successful"
+          else
+            echo "⚠️ Checking build log..."
+            tail -30 "$(pwd)/simulator_build.log" 2>/dev/null || true
+          fi
+          
+          echo "✅ Unity build step complete"
       
-      - name: Build Simulator App with Xcode
+      - name: Build Xcode Project for Simulator
         script: |
-          echo "Building .app for iOS Simulator..."
+          echo "=========================================="
+          echo "🧪 Building Xcode for Simulator..."
+          echo "=========================================="
+          
+          if [ ! -d "build/ios_simulator/Unity-iPhone.xcodeproj" ]; then
+            echo "❌ Xcode project not found"
+            exit 1
+          fi
           
           cd build/ios_simulator
           
-          # Build for simulator (no signing needed!)
+          # Build for simulator (no signing needed)
           xcodebuild \
             -project Unity-iPhone.xcodeproj \
             -scheme Unity-iPhone \
             -configuration Debug \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPad Air 11-inch (M3)' \
+            -derivedDataPath DerivedData \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            build || echo "Build completed"
+            ONLY_ACTIVE_ARCH=NO \
+            build 2>&1 | tail -50
           
-          echo "✅ Simulator app built!"
+          echo "✅ Xcode build complete"
       
-      - name: Start Simulator and Install App
+      - name: Run App on Simulator
         script: |
-          echo "Starting iOS Simulator..."
+          echo "=========================================="
+          echo "🖥️ Starting Simulator..."
+          echo "=========================================="
           
-          # Boot iPad Air simulator
-          xcrun simctl boot "iPad Air 11-inch (M3)" || echo "Simulator may already be booted"
+          # Find the built app
+          APP_PATH=$(find build/ios_simulator/DerivedData -name "*.app" -type d 2>/dev/null | head -1)
           
-          # Open Simulator app (visible via VNC)
-          open -a Simulator
-          
-          # Find and install the app
-          APP_PATH=$(find build -name "*.app" -type d | head -1)
-          
-          if [ -n "$APP_PATH" ]; then
-            echo "Installing app: $APP_PATH"
-            xcrun simctl install booted "$APP_PATH"
-            echo "✅ App installed on simulator"
-            
-            # Launch the app
-            xcrun simctl launch booted "$BUNDLE_ID"
-            echo "✅ App launched!"
-          else
-            echo "⚠️ App not found, check build output"
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ App not found"
+            exit 1
           fi
           
+          echo "Found app: $APP_PATH"
+          
+          # Find an iPad simulator
+          IPAD_UDID=$(xcrun simctl list devices available | grep -i "ipad" | grep -oE '\([A-F0-9-]+\)' | head -1 | tr -d '()')
+          
+          if [ -z "$IPAD_UDID" ]; then
+            echo "❌ No iPad simulator found"
+            exit 1
+          fi
+          
+          echo "Using iPad simulator: $IPAD_UDID"
+          
+          # Boot simulator
+          xcrun simctl boot "$IPAD_UDID" 2>/dev/null || echo "Already booted"
+          
+          # Open Simulator app for VNC
+          open -a Simulator
+          sleep 5
+          
+          # Install and launch app
+          echo "Installing app..."
+          xcrun simctl install "$IPAD_UDID" "$APP_PATH"
+          
+          echo "Launching app..."
+          xcrun simctl launch "$IPAD_UDID" "${BUNDLE_ID}"
+          
           echo ""
           echo "=========================================="
-          echo "🖥️  VNC ACCESS READY!"
+          echo "🖥️  VNC TESTING READY!"
           echo "=========================================="
-          echo "Connect via VNC to test the app."
-          echo "Simulator is running with your app."
+          echo "App is running on iPad simulator."
+          echo "Connect via VNC to test."
           echo ""
-          echo "To interact: Use VNC viewer"
-          echo "To stop: Cancel the build in CodeMagic"
+          echo "Testing window: 2 hours max"
+          echo "Cancel the build when done testing."
           echo "=========================================="
           
-          # Keep the build alive for VNC access (2 hours)
-          echo "Waiting for VNC testing session (2 hours max)..."
+          # Keep alive for VNC testing (2 hours)
           sleep 7200
 
   # ============================================
@@ -560,130 +519,6 @@ workflows:
             echo "No Podfile found - this is normal for most Unity projects"
             echo "Skipping CocoaPods installation"
           fi
-          
-      - name: Build Unity Project for Simulator Testing
-        script: |
-          echo "=========================================="
-          echo "🧪 BUILDING UNITY FOR iOS SIMULATOR"
-          echo "=========================================="
-          
-          # Use the project Unity version
-          UNITY_PATH="/Applications/Unity/Hub/Editor/$UNITY_VERSION/Unity.app/Contents/MacOS/Unity"
-          
-          if [ ! -f "$UNITY_PATH" ]; then
-            # Fallback to any available Unity
-            UNITY_PATH=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
-          fi
-          
-          echo "Using Unity at: $UNITY_PATH"
-          echo "Building for Simulator SDK..."
-          
-          # Build Unity project for simulator using our new BuildIOSSimulator method
-          $UNITY_PATH \
-            -quit \
-            -batchmode \
-            -nographics \
-            -projectPath "$CM_BUILD_DIR" \
-            -executeMethod BuildScript.BuildIOSSimulator \
-            -logFile "$CM_BUILD_DIR/unity_simulator_build.log" || {
-              echo "Unity simulator build encountered an issue"
-              tail -50 "$CM_BUILD_DIR/unity_simulator_build.log" 2>/dev/null || true
-            }
-          
-          # Check if simulator Xcode project was generated
-          if [ -d "$CM_BUILD_DIR/build/ios_simulator/Unity-iPhone.xcodeproj" ]; then
-            echo "✅ Unity simulator build successful"
-          else
-            echo "⚠️ Simulator build may have failed, checking log..."
-            tail -30 "$CM_BUILD_DIR/unity_simulator_build.log" 2>/dev/null || true
-          fi
-          
-      - name: Build and Run Simulator App
-        script: |
-          echo "=========================================="
-          echo "🧪 BUILDING XCODE FOR SIMULATOR"
-          echo "=========================================="
-          
-          SIMULATOR_BUILD_DIR="$CM_BUILD_DIR/build/ios_simulator"
-          
-          if [ ! -d "$SIMULATOR_BUILD_DIR/Unity-iPhone.xcodeproj" ]; then
-            echo "⚠️ Simulator Xcode project not found, skipping simulator test"
-            echo "Continuing with App Store build..."
-            exit 0
-          fi
-          
-          cd "$SIMULATOR_BUILD_DIR"
-          
-          # Build for simulator with Xcode (no signing needed)
-          echo "Building Xcode project for simulator..."
-          xcodebuild \
-            -project Unity-iPhone.xcodeproj \
-            -scheme Unity-iPhone \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            -derivedDataPath DerivedData \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            ONLY_ACTIVE_ARCH=NO \
-            build 2>&1 | tail -100
-          
-          # Find the built simulator app
-          APP_PATH=$(find DerivedData -name "*.app" -type d 2>/dev/null | head -1)
-          
-          if [ -n "$APP_PATH" ]; then
-            echo "✅ Simulator app built: $APP_PATH"
-            
-            # List available iPad simulators
-            echo ""
-            echo "Available iPad simulators:"
-            xcrun simctl list devices available | grep -i "ipad" | head -5
-            
-            # Boot an iPad simulator
-            echo "Booting iPad simulator..."
-            IPAD_UDID=$(xcrun simctl list devices available | grep -i "ipad" | grep -oE '\([A-F0-9-]+\)' | head -1 | tr -d '()')
-            
-            if [ -n "$IPAD_UDID" ]; then
-              xcrun simctl boot "$IPAD_UDID" 2>/dev/null || echo "Simulator already booted"
-              
-              # Open Simulator app for VNC
-              open -a Simulator
-              sleep 5
-              
-              # Install and launch app
-              echo "Installing app..."
-              xcrun simctl install "$IPAD_UDID" "$APP_PATH"
-              
-              echo "Launching app..."
-              xcrun simctl launch "$IPAD_UDID" "${BUNDLE_ID}"
-              
-              echo ""
-              echo "=========================================="
-              echo "🖥️  VNC TESTING READY!"
-              echo "=========================================="
-              echo "App is running on iPad simulator."
-              echo "Connect via VNC to test."
-              echo ""
-              echo "Testing window: 30 minutes"
-              echo "Build will auto-continue after testing."
-              echo "=========================================="
-              
-              # Wait 30 minutes for testing
-              echo ""
-              echo "⏱️  Waiting 30 minutes for VNC testing..."
-              sleep 1800
-              
-              echo "✅ Testing complete. Continuing to App Store build..."
-            else
-              echo "⚠️ No iPad simulator found"
-            fi
-          else
-            echo "⚠️ Simulator app build failed"
-            echo "Continuing with App Store build..."
-          fi
-          
-          # Clean up simulator build
-          rm -rf "$SIMULATOR_BUILD_DIR"
           
       - name: Build IPA
         script: |
