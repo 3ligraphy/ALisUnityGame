@@ -79,14 +79,73 @@ workflows:
             echo "⚠️ License file not found, but continuing (activation may have succeeded)"
           fi
       
+      - name: Detect Unity Version from Project
+        script: |
+          echo "=========================================="
+          echo "Detecting Unity version from project..."
+          echo "=========================================="
+          
+          # Extract Unity version and changeset from ProjectSettings/ProjectVersion.txt
+          UNITY_VERSION=$(echo $(sed -n '1p' ProjectSettings/ProjectVersion.txt) | cut -c 18-)
+          UNITY_VERSION_CHANGESET=$(echo $(sed -n '2p' ProjectSettings/ProjectVersion.txt) | cut -d "(" -f2 | cut -d ")" -f1 | xargs)
+          
+          echo "Unity Version: $UNITY_VERSION"
+          echo "Changeset: $UNITY_VERSION_CHANGESET"
+          
+          # Export to environment for use in subsequent scripts
+          echo "UNITY_VERSION=$UNITY_VERSION" >> $CM_ENV
+          echo "UNITY_VERSION_CHANGESET=$UNITY_VERSION_CHANGESET" >> $CM_ENV
+          echo "UNITY_HOME=/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity.app" >> $CM_ENV
+          
+          echo "✅ Unity version detected: $UNITY_VERSION"
+      
+      - name: Install Unity Version via Unity Hub
+        script: |
+          echo "=========================================="
+          echo "Installing Unity ${UNITY_VERSION}..."
+          echo "=========================================="
+          
+          # Check if Unity version is already installed
+          UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity.app/Contents/MacOS/Unity"
+          
+          if [ -f "$UNITY_PATH" ]; then
+            echo "✅ Unity ${UNITY_VERSION} already installed"
+          else
+            echo "Installing Unity ${UNITY_VERSION} with iOS module..."
+            
+            # Install Unity version with required modules
+            yes Y | /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- \
+              --headless install \
+              --version $UNITY_VERSION \
+              --changeset $UNITY_VERSION_CHANGESET \
+              -a arm64
+            
+            # Install iOS Build Support module
+            yes Y | /Applications/Unity\ Hub.app/Contents/MacOS/Unity\ Hub -- \
+              --headless install-modules \
+              --version $UNITY_VERSION \
+              -m ios \
+              -a arm64
+            
+            echo "✅ Unity ${UNITY_VERSION} installation complete"
+          fi
+          
+          # Verify installation
+          if [ -f "$UNITY_PATH" ]; then
+            echo "✅ Unity verified at: $UNITY_PATH"
+          else
+            echo "❌ Unity installation failed"
+            exit 1
+          fi
+      
       - name: Build Unity Project for Simulator
         script: |
           echo "=========================================="
           echo "🧪 Building for iOS Simulator..."
           echo "=========================================="
           
-          # Use CodeMagic's pre-installed Unity
-          UNITY_PATH=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
+          # Use the project's Unity version (Unity 6)
+          UNITY_PATH="$UNITY_HOME/Contents/MacOS/Unity"
           
           echo "Using Unity at: $UNITY_PATH"
           
