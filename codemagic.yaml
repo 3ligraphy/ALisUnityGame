@@ -23,7 +23,7 @@ workflows:
   # ============================================
   ios-simulator-test:
     name: iOS Simulator Test (VNC)
-    max_build_duration: 180
+    max_build_duration: 120
     instance_type: mac_mini_m1
     environment:
       # Use CodeMagic's pre-installed Unity 2022.3 which works with Personal license
