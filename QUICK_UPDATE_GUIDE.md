@@ -51,3 +51,4 @@ UNITY_PASSWORD: "MySecurePassword123"
 
 **Done!** Your `codemagic.yaml` is now configured with your credentials.
 
+
