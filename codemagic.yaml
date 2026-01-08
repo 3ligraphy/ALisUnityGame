@@ -224,6 +224,99 @@ workflows:
             echo "⚠️  Build log not found, but continuing..."
           fi
       
+      # ============================================
+      # SIMULATOR TESTING STEP
+      # Builds for simulator SDK, runs on iPad, waits for VNC testing
+      # ============================================
+      - name: Build Unity for Simulator Testing
+        script: |
+          echo "=========================================="
+          echo "🧪 Building Unity for iOS SIMULATOR..."
+          echo "=========================================="
+          
+          UNITY_PATH="$UNITY_HOME/Contents/MacOS/Unity"
+          
+          # Build Unity for Simulator using BuildIOSSimulator method
+          echo "Building with SimulatorSDK..."
+          
+          $UNITY_PATH \
+            -quit \
+            -batchmode \
+            -nographics \
+            -projectPath "$CM_BUILD_DIR" \
+            -executeMethod BuildScript.BuildIOSSimulator \
+            -logFile "$CM_BUILD_DIR/simulator_build.log" \
+            || true
+          
+          if [ -d "$CM_BUILD_DIR/build/ios_simulator/Unity-iPhone.xcodeproj" ]; then
+            echo "✅ Unity Simulator build succeeded!"
+          else
+            echo "⚠️ Simulator build failed, skipping simulator test"
+            tail -30 "$CM_BUILD_DIR/simulator_build.log" 2>/dev/null || true
+          fi
+      
+      - name: Run on iOS Simulator (VNC Testing)
+        script: |
+          echo "=========================================="
+          echo "🧪 Running on iOS Simulator..."
+          echo "=========================================="
+          
+          SIMULATOR_BUILD="$CM_BUILD_DIR/build/ios_simulator"
+          
+          if [ ! -d "$SIMULATOR_BUILD/Unity-iPhone.xcodeproj" ]; then
+            echo "⚠️ Xcode project not found, skipping simulator"
+            exit 0
+          fi
+          
+          cd "$SIMULATOR_BUILD"
+          
+          # Build for simulator with Xcode
+          echo "Building Xcode for simulator..."
+          xcodebuild \
+            -project Unity-iPhone.xcodeproj \
+            -scheme Unity-iPhone \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath DerivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            build 2>&1 | tail -30 || true
+          
+          APP_PATH=$(find DerivedData -name "*.app" -type d 2>/dev/null | head -1)
+          
+          if [ -n "$APP_PATH" ]; then
+            echo "✅ App built: $APP_PATH"
+            
+            IPAD_UDID=$(xcrun simctl list devices available | grep -i "ipad" | grep -oE '\([A-F0-9-]+\)' | head -1 | tr -d '()')
+            
+            if [ -n "$IPAD_UDID" ]; then
+              echo "Booting iPad: $IPAD_UDID"
+              xcrun simctl boot "$IPAD_UDID" 2>/dev/null || true
+              open -a Simulator
+              sleep 5
+              
+              xcrun simctl install "$IPAD_UDID" "$APP_PATH"
+              xcrun simctl launch "$IPAD_UDID" "${BUNDLE_ID}"
+              
+              echo ""
+              echo "=========================================="
+              echo "🖥️  VNC TESTING READY!"
+              echo "=========================================="
+              echo "Connect via VNC to test (30 min window)"
+              echo "=========================================="
+              
+              sleep 1800
+              
+              xcrun simctl shutdown "$IPAD_UDID" 2>/dev/null || true
+              echo "✅ Testing complete"
+            fi
+          fi
+          
+          rm -rf "$CM_BUILD_DIR/build/ios_simulator"
+          echo "Continuing with App Store build..."
+      
       - name: Configure Xcode Project
         script: |
           echo "=========================================="
@@ -267,9 +360,9 @@ workflows:
             /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${BUNDLE_ID}" "$INFO_PLIST" 2>/dev/null || \
             echo "⚠️  Could not set bundle identifier"
             
-            # Set version (fourth submission - Gate button sizes fixed)
-            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.4" "$INFO_PLIST" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.4" "$INFO_PLIST" 2>/dev/null || \
+            # Set version (fifth submission - iPad popup layout fixed, Unity 2022.3 for license)
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.5" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.5" "$INFO_PLIST" 2>/dev/null || \
             echo "⚠️  Could not set version"
             
             # Set build number (MUST exist for App Store Connect)

@@ -1,0 +1,60 @@
+==========================================
+Activating Unity license...
+==========================================
+Using Unity at: /Applications/Unity/Hub/Editor/2022.3.47f1/Unity.app/Contents/MacOS/Unity
+Activating Unity Personal license with email: ali.motawea@bue.edu.eg
+Unity Editor version:    2022.3.47f1 (88c277b85d21)
+Branch:                  2022.3/staging
+Build type:              Release
+Batch mode:              YES
+macOS version:           Version 26.1 (Build 25B78)
+Darwin version:          25.1.0
+Architecture:            x86_64
+Running under Rosetta:   YES
+Available memory:        12288 MB
+User ali.motawea@bue.edu.eg logged in successfully
+[UnityConnect::TryLogin] Request Succeeded.
+[Licensing::Module] Trying to connect to existing licensing client channel...
+[Licensing::IpcConnector] Connection attempt to the License Client on channel: "LicenseClient-builder" failed because channel doesn't exist; code: "0x80000002"
+Launching external process: /Applications/Unity/Hub/Editor/2022.3.47f1/Unity.app/Contents/Frameworks/UnityLicensingClient.app/Contents/MacOS/Unity.Licensing.Client
+[Licensing::Module] Successfully launched the LicensingClient (PId: 1512)
+[Licensing::IpcConnector] Successfully connected to the License Client on channel: "LicenseClient-builder" at "2025-12-30T17:10:48.060661Z"
+[Licensing::Client] Error: Code 1 while verifying Licensing Client signature (process Id: 1512, path: "/Applications/Unity/Hub/Editor/2022.3.47f1/Unity.app/Contents/Frameworks/UnityLicensingClient.app/Contents/MacOS/Unity.Licensing.Client")
+[Licensing::Module] Error: LicensingClient has failed validation; ignoring
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.15.5+a2f8afb
+  Session Id:              17f1323774634c4c903ba0eb20470ee7
+  Correlation Id:          0f81697ee7ba6432e9c939b8af82b38c
+  External correlation Id: 6046924763418642415
+  Machine Id:              hvi5SxYUjRVTyB1QSMMsUXNxPqE=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-builder" (connect: 3.88s, validation: 0.33s, handshake: 0.43s)
+[Licensing::IpcConnector] Successfully connected to the License Notification on channel: "LicenseClient-builder-notifications" at "2025-12-30T17:10:48.813418Z"
+[Licensing::Module] Connected to LicensingClient (PId: 1512, launch time: 0.01, total connection time: 4.63s)
+[Licensing::Client] Successfully updated the access token
+[Licensing::Module] Successfully updated the access token KcL4DVBn6Z...
+[Licensing::Client] Successfully processed license management request
+[Licensing::Module] Successfully activated the entitlement license
+[Licensing::Module] Serial number empty for ULF activation; ignoring
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] Serial number assigned to: "11270629079568-alimotawea-UnityProStuXXXX"
+Pro License: YES
+[Licensing::Client] Successfully resolved entitlement details
+Launching external process: /Applications/Unity/Hub/Editor/2022.3.47f1/Unity.app/Contents/Resources/PackageManager/Server/UnityPackageManager
+
+COMMAND LINE ARGUMENTS:
+/Applications/Unity/Hub/Editor/2022.3.47f1/Unity.app/Contents/MacOS/Unity
+
+-quit
+-batchmode
+-nographics
+-serial
+(hidden)
+
+ali.motawea@bue.edu.eg
+-password
+(hidden)
+-logFile
+-
+
+[Package Manager] Server::Kill -- Server was shutdown
+⚠️ License file not found, but continuing (activation may have succeeded)
