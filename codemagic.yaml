@@ -31,7 +31,7 @@ workflows:
       vars:
         # Unity Student account credentials
         # ⚠️ WARNING: These will be visible in your Git repository!
-        UNITY_EMAIL: "ali.motawea@bue.edu.eg"  # Your Unity Student account
+        UNITY_EMAIL: "ali.mohamed@alum.bue.edu.eg"  # Your Unity Student account
         UNITY_PASSWORD: "AJ1422003249aj*"      # Your Unity password
         UNITY_SERIAL: "SC-YN3Y-BWZT-N9FP-7QZ2-BGVN"  # Your Unity serial number
         
