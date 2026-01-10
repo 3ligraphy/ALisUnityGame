@@ -33,7 +33,7 @@ workflows:
         # ⚠️ WARNING: These will be visible in your Git repository!
         UNITY_EMAIL: "ali.mohamed@alum.bue.edu.eg"  # Your Unity Student account
         UNITY_PASSWORD: "AJ1422003249aj*"      # Your Unity password
-        UNITY_SERIAL: "SC-YN3Y-BWZT-N9FP-7QZ2-BGVN"  # Your Unity serial number
+        UNITY_SERIAL: "SC-R5R8-3499-EVB4-MBEM-BAE7"  # Your Unity serial number
         
         # Bundle identifier - already configured for your app
         BUNDLE_ID: "com.failaka.games.adventure"
