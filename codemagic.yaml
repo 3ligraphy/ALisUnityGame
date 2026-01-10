@@ -29,10 +29,11 @@ workflows:
       # The actual project build uses Unity 6000.2.15f1 installed via Unity Hub CLI
       unity: 2022.3.47f1
       vars:
-        # Unity Student account credentials (includes headless build rights)
+        # Unity Student account credentials
         # ⚠️ WARNING: These will be visible in your Git repository!
         UNITY_EMAIL: "ali.motawea@bue.edu.eg"  # Your Unity Student account
         UNITY_PASSWORD: "AJ1422003249aj*"      # Your Unity password
+        UNITY_SERIAL: "SC-YN3Y-BWZT-N9FP-7QZ2-BGVN"  # Your Unity serial number
         
         # Bundle identifier - already configured for your app
         BUNDLE_ID: "com.failaka.games.adventure"
@@ -78,7 +79,7 @@ workflows:
       - name: Activate Unity License
         script: |
           echo "=========================================="
-          echo "Activating Unity license..."
+          echo "Activating Unity license with Serial..."
           echo "=========================================="
           
           # Ensure license directory exists
@@ -89,34 +90,31 @@ workflows:
           
           if [ -z "$TEMP_UNITY" ]; then
             echo "❌ No Unity installation found for license activation"
-            echo "Available Unity installations:"
             ls -la /Applications/Unity/Hub/Editor/ 2>/dev/null || echo "No Unity Hub Editor directory found"
             exit 1
           fi
           
           echo "Using Unity at: $TEMP_UNITY"
-          echo "Activating Unity Personal license with email: ${UNITY_EMAIL}"
+          echo "Activating Unity license with serial number..."
           
-          # Activate Unity license (Personal/Free license)
-          # For Personal license, use -serial flag without serial number
+          # Activate with explicit serial number
           $TEMP_UNITY \
             -quit \
             -batchmode \
             -nographics \
-            -serial \
+            -serial "${UNITY_SERIAL}" \
             -username "${UNITY_EMAIL}" \
             -password "${UNITY_PASSWORD}" \
             -logFile - || true
           
-          # Wait a moment for license file to be created
-          sleep 3
+          # Wait for license to be processed
+          sleep 5
           
           # Check if license was activated
           if [ -f "$HOME/Library/Application Support/Unity/Unity_lic.ulf" ]; then
             echo "✅ Unity license activated successfully"
-            echo "License file created at: $HOME/Library/Application Support/Unity/Unity_lic.ulf"
           else
-            echo "⚠️ License file not found, but continuing (activation may have succeeded)"
+            echo "⚠️ License file not found, but continuing..."
           fi
       
       - name: Install Unity Version via Unity Hub
