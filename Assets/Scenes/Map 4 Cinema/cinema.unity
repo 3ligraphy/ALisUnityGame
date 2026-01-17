@@ -9970,7 +9970,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
+      - m_Target: {fileID: 1664059130}
         m_TargetAssemblyTypeName: TicketAccessGate, Assembly-CSharp
         m_MethodName: TryAccess
         m_Mode: 1
@@ -28207,6 +28207,7 @@ GameObject:
   - component: {fileID: 1664059127}
   - component: {fileID: 1664059129}
   - component: {fileID: 1664059128}
+  - component: {fileID: 1664059130}
   m_Layer: 5
   m_Name: Panel Tect
   m_TagString: Untagged
@@ -28274,6 +28275,24 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1664059126}
   m_CullTransparentMesh: 1
+--- !u!114 &1664059130
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1664059126}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3c8fc1d54a9443408dd7bd5e63ff4c6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TicketAccessGate
+  correctCode: CINEMA2026
+  targetSceneIndex: 5
+  popupPanel: {fileID: 1664059126}
+  codeInputField: {fileID: 2125254085}
+  feedbackText: {fileID: 232785938}
+  gateBlocker: {fileID: 1664059126}
 --- !u!4 &1664622458 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 400000, guid: f06abd3d8dae923439b59fd4ccf64ab9,
