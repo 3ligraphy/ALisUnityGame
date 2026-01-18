@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 [RequireComponent(typeof(CharacterController))]
 public class FirstPersonController : MonoBehaviour
@@ -71,6 +72,11 @@ public class FirstPersonController : MonoBehaviour
 
     void HandleMouseLook()
     {
+        // Skip camera rotation when touching UI elements (like the joystick)
+        // This prevents the camera from rotating while using the movement joystick on mobile
+        if (IsTouchingUI())
+            return;
+
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
 
@@ -79,6 +85,34 @@ public class FirstPersonController : MonoBehaviour
 
         playerCamera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
         transform.Rotate(Vector3.up * mouseX);
+    }
+
+    /// <summary>
+    /// Checks if any touch or mouse click is over a UI element.
+    /// Used to prevent camera rotation when interacting with UI (joystick, buttons, etc.)
+    /// </summary>
+    private bool IsTouchingUI()
+    {
+        // Check for touch input on mobile devices
+        if (Input.touchCount > 0 && EventSystem.current != null)
+        {
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                if (EventSystem.current.IsPointerOverGameObject(Input.GetTouch(i).fingerId))
+                {
+                    return true;
+                }
+            }
+        }
+        // Check for mouse input (for editor testing and desktop)
+        else if (Input.GetMouseButton(0) && EventSystem.current != null)
+        {
+            if (EventSystem.current.IsPointerOverGameObject())
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     void HandleJump()
