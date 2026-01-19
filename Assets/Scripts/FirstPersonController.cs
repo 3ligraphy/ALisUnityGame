@@ -9,7 +9,10 @@ public class FirstPersonController : MonoBehaviour
     public float gravity = -9.81f;
     public float jumpHeight = 1.5f;
 
-    [Header("Mouse Look Settings")]
+    [Header("Touch Look Settings")]
+    [Tooltip("Sensitivity for touch-based camera rotation")]
+    public float touchSensitivity = 0.15f;
+    [Tooltip("Mouse sensitivity for desktop testing")]
     public float mouseSensitivity = 2f;
     public Transform playerCamera;
 
@@ -17,70 +20,62 @@ public class FirstPersonController : MonoBehaviour
     public VariableJoystick joystick;
 
     [Header("UI Control")]
-    public bool uiOpen = false; // لو UI فاتح هوقف الماوس و الحركة
+    public bool uiOpen = false;
+
+    [Header("Touch Zones")]
+    [Tooltip("The left portion of the screen reserved for joystick (0.0-1.0)")]
+    public float joystickZoneWidth = 0.4f;
+    [Tooltip("The bottom portion of screen for joystick (0.0-1.0)")]
+    public float joystickZoneHeight = 0.5f;
 
     private CharacterController controller;
     private Vector3 velocity;
     private float xRotation = 0f;
+    
+    // Touch tracking for multi-touch support
+    private int lookTouchId = -1;  // ID of the finger used for camera look
+    private Vector2 lastLookTouchPosition;
 
     void Start()
     {
         controller = GetComponent<CharacterController>();
 
-        // الماوس يكون ظاهر
+        // Cursor visible on mobile
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
         
-        // Auto-find joystick if not assigned
+        // Enable multi-touch
+        Input.multiTouchEnabled = true;
+        
+        // Try to find joystick if not assigned
         if (joystick == null)
         {
-            // Try to find any joystick type
             joystick = FindObjectOfType<VariableJoystick>();
-            
-            // If still null, try to find by name
-            if (joystick == null)
+            if (joystick != null)
             {
-                GameObject joystickObj = GameObject.Find("Variable Joystick");
-                if (joystickObj != null)
-                {
-                    joystick = joystickObj.GetComponent<VariableJoystick>();
-                }
+                Debug.Log("FirstPersonController: Found VariableJoystick automatically");
             }
-        }
-        
-        // Log joystick status for debugging
-        if (joystick != null)
-        {
-            Debug.Log($"FirstPersonController: Joystick found - {joystick.gameObject.name}");
-        }
-        else
-        {
-            Debug.LogError("FirstPersonController: NO JOYSTICK FOUND! Mobile controls will not work!");
-        }
-        
-        // Log EventSystem status
-        if (EventSystem.current != null)
-        {
-            Debug.Log("FirstPersonController: EventSystem found");
-        }
-        else
-        {
-            Debug.LogError("FirstPersonController: NO EventSystem! UI input will not work!");
+            else
+            {
+                Debug.LogWarning("FirstPersonController: No VariableJoystick found in scene!");
+            }
         }
     }
 
     void Update()
     {
-        // لو الـ Popup مفتوح → امنع الحركة ولف الكاميرا
+        // If popup is open, stop all movement and look
         if (uiOpen)
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
+            lookTouchId = -1;  // Reset look touch
             return;
         }
 
         HandleMovement();
-        HandleMouseLook();
+        HandleTouchLook();
+        HandleMouseLook();  // For desktop/editor testing
         HandleJump();
     }
 
@@ -89,29 +84,31 @@ public class FirstPersonController : MonoBehaviour
         float x = Input.GetAxis("Horizontal");
         float z = Input.GetAxis("Vertical");
 
-        // Get joystick input - this is the PRIMARY input method on mobile
+        // Get joystick input - this is the PRIMARY input for mobile
         if (joystick != null)
         {
-            // Use joystick values directly (not adding, as keyboard won't be used on mobile)
             float joyX = joystick.Horizontal;
             float joyZ = joystick.Vertical;
             
-            // Only use joystick if it has significant input (dead zone)
-            if (Mathf.Abs(joyX) > 0.1f || Mathf.Abs(joyZ) > 0.1f)
-            {
-                x = joyX;
-                z = joyZ;
-            }
+            // Add joystick input to movement
+            x += joyX;
+            z += joyZ;
+        }
+
+        // Clamp to prevent faster diagonal movement
+        Vector2 inputVector = new Vector2(x, z);
+        if (inputVector.magnitude > 1f)
+        {
+            inputVector.Normalize();
+            x = inputVector.x;
+            z = inputVector.y;
         }
 
         // Apply movement
-        if (Mathf.Abs(x) > 0.01f || Mathf.Abs(z) > 0.01f)
-        {
-            Vector3 move = transform.right * x + transform.forward * z;
-            controller.Move(move * moveSpeed * Time.deltaTime);
-        }
+        Vector3 move = transform.right * x + transform.forward * z;
+        controller.Move(move * moveSpeed * Time.deltaTime);
 
-        // Apply gravity
+        // Handle gravity
         if (controller.isGrounded && velocity.y < 0)
         {
             velocity.y = -2f;
@@ -121,97 +118,133 @@ public class FirstPersonController : MonoBehaviour
         controller.Move(velocity * Time.deltaTime);
     }
 
-    void HandleMouseLook()
+    /// <summary>
+    /// Handle touch-based camera look for iOS/mobile with proper multi-touch support.
+    /// Only uses touches on the RIGHT side of the screen (outside joystick zone).
+    /// </summary>
+    void HandleTouchLook()
     {
-        // Skip camera rotation when touching UI elements (like the joystick)
-        // This prevents the camera from rotating while using the movement joystick on mobile
-        if (IsTouchingUI())
+        if (Input.touchCount == 0)
+        {
+            lookTouchId = -1;
             return;
+        }
 
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
-
-        xRotation -= mouseY;
-        xRotation = Mathf.Clamp(xRotation, -80f, 80f);
-
-        playerCamera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
-        transform.Rotate(Vector3.up * mouseX);
+        // Process all touches
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+            
+            // Handle new touch - find one on the right side of the screen for look
+            if (touch.phase == TouchPhase.Began)
+            {
+                // Skip if this touch is in the joystick zone (left/bottom)
+                if (IsTouchInJoystickZone(touch.position))
+                    continue;
+                
+                // Skip if touching UI elements
+                if (IsTouchOverUI(touch.fingerId))
+                    continue;
+                
+                // This touch is valid for camera look
+                if (lookTouchId == -1)
+                {
+                    lookTouchId = touch.fingerId;
+                    lastLookTouchPosition = touch.position;
+                }
+            }
+            // Handle movement of the look touch
+            else if (touch.fingerId == lookTouchId)
+            {
+                if (touch.phase == TouchPhase.Moved || touch.phase == TouchPhase.Stationary)
+                {
+                    // Calculate delta movement
+                    Vector2 delta = touch.position - lastLookTouchPosition;
+                    lastLookTouchPosition = touch.position;
+                    
+                    // Apply camera rotation based on touch delta
+                    float rotateX = delta.x * touchSensitivity;
+                    float rotateY = delta.y * touchSensitivity;
+                    
+                    // Rotate player (horizontal look)
+                    transform.Rotate(Vector3.up * rotateX);
+                    
+                    // Rotate camera (vertical look)
+                    xRotation -= rotateY;
+                    xRotation = Mathf.Clamp(xRotation, -80f, 80f);
+                    playerCamera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+                }
+                else if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
+                {
+                    lookTouchId = -1;
+                }
+            }
+        }
     }
 
     /// <summary>
-    /// Checks if any touch or mouse click is over a UI element.
-    /// Used to prevent camera rotation when interacting with UI (joystick, buttons, etc.)
-    /// More reliable version for iOS that handles edge cases.
+    /// Handle mouse look for desktop/editor testing only.
+    /// On mobile, this is disabled in favor of touch.
     /// </summary>
-    private bool IsTouchingUI()
+    void HandleMouseLook()
     {
-        // Safety check - if no EventSystem, assume not touching UI
+        // Skip on mobile - use touch instead
+        if (Input.touchCount > 0)
+            return;
+        
+        // Skip if clicking on UI
+        if (Input.GetMouseButton(0) && EventSystem.current != null && 
+            EventSystem.current.IsPointerOverGameObject())
+            return;
+        
+        // Only process if right mouse button is held (for desktop testing)
+        // Or if left click is not on UI
+        if (Input.GetMouseButton(1) || 
+            (Input.GetMouseButton(0) && !IsMouseOverUI()))
+        {
+            float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
+            float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
+
+            xRotation -= mouseY;
+            xRotation = Mathf.Clamp(xRotation, -80f, 80f);
+
+            playerCamera.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+            transform.Rotate(Vector3.up * mouseX);
+        }
+    }
+
+    /// <summary>
+    /// Checks if a touch position is in the joystick zone (left/bottom of screen)
+    /// </summary>
+    private bool IsTouchInJoystickZone(Vector2 touchPosition)
+    {
+        float screenWidthThreshold = Screen.width * joystickZoneWidth;
+        float screenHeightThreshold = Screen.height * joystickZoneHeight;
+        
+        return touchPosition.x < screenWidthThreshold && 
+               touchPosition.y < screenHeightThreshold;
+    }
+
+    /// <summary>
+    /// Checks if a specific touch is over a UI element using EventSystem
+    /// </summary>
+    private bool IsTouchOverUI(int fingerId)
+    {
         if (EventSystem.current == null)
             return false;
             
-        // Check for touch input on mobile devices
-        if (Input.touchCount > 0)
-        {
-            for (int i = 0; i < Input.touchCount; i++)
-            {
-                Touch touch = Input.GetTouch(i);
-                
-                // Skip ended/cancelled touches
-                if (touch.phase == TouchPhase.Ended || touch.phase == TouchPhase.Canceled)
-                    continue;
-                
-                // Use try-catch because IsPointerOverGameObject can fail on iOS in some cases
-                try
-                {
-                    if (EventSystem.current.IsPointerOverGameObject(touch.fingerId))
-                    {
-                        return true;
-                    }
-                }
-                catch
-                {
-                    // If it fails, check if we're touching the joystick area directly
-                    if (joystick != null && IsTouchInJoystickArea(touch.position))
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-        // Check for mouse input (for editor testing and desktop)
-        else if (Input.GetMouseButton(0))
-        {
-            try
-            {
-                if (EventSystem.current.IsPointerOverGameObject())
-                {
-                    return true;
-                }
-            }
-            catch
-            {
-                return false;
-            }
-        }
-        return false;
+        return EventSystem.current.IsPointerOverGameObject(fingerId);
     }
-    
+
     /// <summary>
-    /// Fallback check if touch is in joystick area (for when EventSystem fails)
+    /// Checks if mouse is over UI (for desktop testing)
     /// </summary>
-    private bool IsTouchInJoystickArea(Vector2 touchPosition)
+    private bool IsMouseOverUI()
     {
-        if (joystick == null) return false;
-        
-        RectTransform joystickRect = joystick.GetComponent<RectTransform>();
-        if (joystickRect == null) return false;
-        
-        // Simple check: if touch is in bottom-left quadrant, assume joystick
-        // Joystick is typically positioned in bottom-left
-        float screenWidth = Screen.width;
-        float screenHeight = Screen.height;
-        
-        return touchPosition.x < screenWidth * 0.4f && touchPosition.y < screenHeight * 0.5f;
+        if (EventSystem.current == null)
+            return false;
+            
+        return EventSystem.current.IsPointerOverGameObject();
     }
 
     void HandleJump()
@@ -222,20 +255,17 @@ public class FirstPersonController : MonoBehaviour
         }
     }
 
-    // نستدعي الدالة دي من سكربت الكيوب عند فتح/قفل الـ UI
+    // Called from popup scripts when UI opens/closes
     public void SetUIOpen(bool isOpen)
     {
         uiOpen = isOpen;
-
+        
         if (isOpen)
         {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            lookTouchId = -1;  // Reset look touch when UI opens
         }
-        else
-        {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-        }
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 }

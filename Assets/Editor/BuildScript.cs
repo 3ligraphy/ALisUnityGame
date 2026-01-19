@@ -34,10 +34,10 @@ public class BuildScript
         // Configure company and product names for App Store compliance
         PlayerSettings.companyName = "Failaka Games";
         PlayerSettings.productName = "Failaka Island";
-        PlayerSettings.bundleVersion = "1.0.8";  // Eighth submission - iOS-specific fixes for touch input and EventSystem
+        PlayerSettings.bundleVersion = "1.0.7";  // Seventh submission - Fixed button onClick + improved joystick reliability on iOS
         Debug.Log("✅ Set company: Failaka Games");
         Debug.Log("✅ Set product: Failaka Island");
-        Debug.Log("✅ Set version: 1.0.8");
+        Debug.Log("✅ Set version: 1.0.7");
 
     // Set app icon automatically
     string iconPath = "Assets/AppIcon.png";
@@ -160,7 +160,7 @@ public class BuildScript
         // Configure company and product names
         PlayerSettings.companyName = "Failaka Games";
         PlayerSettings.productName = "Failaka Island";
-        PlayerSettings.bundleVersion = "1.0.8";
+        PlayerSettings.bundleVersion = "1.0.7";
         
         // Set bundle identifier
         string bundleId = Environment.GetEnvironmentVariable("BUNDLE_ID");

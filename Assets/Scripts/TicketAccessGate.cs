@@ -30,6 +30,8 @@ public class TicketAccessGate : MonoBehaviour
     public Color feedbackSuccessColor = new Color(0.2f, 0.7f, 0.3f, 1f);  // Green for success
 
     private bool playerNearby = false;
+    private bool isProcessingAccess = false;  // Prevent double-triggering
+    private float lastAccessAttemptTime = 0f;  // Cooldown for access attempts
 
     void Start()
     {
@@ -47,60 +49,50 @@ public class TicketAccessGate : MonoBehaviour
     }
 
     /// <summary>
-    /// Finds the submit button in the popup if not manually assigned
+    /// Finds the submit button in the popup if not manually assigned and connects the click handler
     /// </summary>
     void FindSubmitButton()
     {
         if (submitButton == null && popupPanel != null)
         {
             // Try to find a button in the popup panel
-            submitButton = popupPanel.GetComponentInChildren<Button>(true); // include inactive
-            
-            // If still null, try to find by common names
-            if (submitButton == null)
-            {
-                Transform buttonTransform = popupPanel.transform.Find("Button");
-                if (buttonTransform == null) buttonTransform = popupPanel.transform.Find("Go");
-                if (buttonTransform == null) buttonTransform = popupPanel.transform.Find("Submit");
-                if (buttonTransform == null) buttonTransform = popupPanel.transform.Find("Go Button");
-                
-                if (buttonTransform != null)
-                {
-                    submitButton = buttonTransform.GetComponent<Button>();
-                }
-            }
+            submitButton = popupPanel.GetComponentInChildren<Button>();
         }
         
-        // CRITICAL: Connect the button's onClick to TryAccess
+        // CRITICAL: Connect the button click to TryAccess method
         if (submitButton != null)
         {
-            // Remove any existing listeners to avoid duplicates
-            submitButton.onClick.RemoveAllListeners();
-            // Add our TryAccess method as the click handler
-            submitButton.onClick.AddListener(TryAccess);
-            Debug.Log($"TicketAccessGate: Submit button '{submitButton.gameObject.name}' connected to TryAccess()");
-            
-            // Also ensure the button is interactable
+            // Ensure button is interactable
             submitButton.interactable = true;
             
-            // Ensure button has raycast target
-            UnityEngine.UI.Image buttonImage = submitButton.GetComponent<UnityEngine.UI.Image>();
+            // Ensure raycast is enabled on the button image
+            Image buttonImage = submitButton.GetComponent<Image>();
             if (buttonImage != null)
             {
                 buttonImage.raycastTarget = true;
             }
+            
+            // Remove any existing listeners to avoid duplicates
+            submitButton.onClick.RemoveAllListeners();
+            
+            // Add the click handler
+            submitButton.onClick.AddListener(OnSubmitButtonClicked);
+            
+            Debug.Log("TicketAccessGate: Submit button connected to OnSubmitButtonClicked()");
         }
         else
         {
-            Debug.LogError("TicketAccessGate: NO SUBMIT BUTTON FOUND! Listing all children:");
-            if (popupPanel != null)
-            {
-                foreach (Transform child in popupPanel.transform)
-                {
-                    Debug.Log($"  Child: {child.name} - Has Button: {child.GetComponent<Button>() != null}");
-                }
-            }
+            Debug.LogError("TicketAccessGate: No submit button found! Button clicks will not work.");
         }
+    }
+
+    /// <summary>
+    /// Called when the submit button is clicked. This wrapper ensures the click is processed.
+    /// </summary>
+    void OnSubmitButtonClicked()
+    {
+        Debug.Log("TicketAccessGate: Submit button clicked!");
+        TryAccess();
     }
 
     /// <summary>
@@ -373,17 +365,65 @@ public class TicketAccessGate : MonoBehaviour
 
     void Update()
     {
-        // لو اللاعب قريب وضغط Enter
+        // If player nearby and pressed Enter
         if (playerNearby && Input.GetKeyDown(KeyCode.Return))
         {
             TryAccess();
         }
         
-        // Handle touch input for iOS - activate input field when touched
+        // Handle touch input for iOS - activate input field and button when touched
         if (playerNearby && popupPanel.activeSelf)
         {
             HandleTouchInput();
+            HandleButtonTouchFallback();
         }
+    }
+
+    /// <summary>
+    /// Fallback touch handler for the submit button on iOS.
+    /// Sometimes Unity Button.onClick doesn't fire reliably on iOS, so we detect touches manually.
+    /// </summary>
+    void HandleButtonTouchFallback()
+    {
+        if (submitButton == null) return;
+        
+        // Check for touch input (iOS)
+        if (Input.touchCount > 0)
+        {
+            Touch touch = Input.GetTouch(0);
+            // Only trigger on touch up (finger lifted) to prevent double-firing
+            if (touch.phase == TouchPhase.Ended)
+            {
+                if (IsTouchOverButton(touch.position))
+                {
+                    Debug.Log("TicketAccessGate: Button touched via fallback handler");
+                    TryAccess();
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks if a screen position is over the submit button
+    /// </summary>
+    bool IsTouchOverButton(Vector2 screenPosition)
+    {
+        if (submitButton == null) return false;
+        
+        RectTransform buttonRect = submitButton.GetComponent<RectTransform>();
+        if (buttonRect == null) return false;
+        
+        // Get the canvas for proper coordinate conversion
+        Canvas canvas = submitButton.GetComponentInParent<Canvas>();
+        if (canvas == null) return false;
+        
+        Camera cam = null;
+        if (canvas.renderMode == RenderMode.ScreenSpaceCamera || canvas.renderMode == RenderMode.WorldSpace)
+        {
+            cam = canvas.worldCamera;
+        }
+        
+        return RectTransformUtility.RectangleContainsScreenPoint(buttonRect, screenPosition, cam);
     }
 
     /// <summary>
@@ -444,9 +484,20 @@ public class TicketAccessGate : MonoBehaviour
 
     public void TryAccess()
     {
+        // Prevent double-triggering with a short cooldown
+        if (Time.time - lastAccessAttemptTime < 0.3f)
+        {
+            Debug.Log("TicketAccessGate: Ignoring duplicate access attempt");
+            return;
+        }
+        lastAccessAttemptTime = Time.time;
+        
+        if (isProcessingAccess) return;
         if (codeInputField == null) return;
         
         string enteredCode = codeInputField.text.Trim();
+        
+        Debug.Log($"TicketAccessGate: TryAccess called with code: '{enteredCode}'");
 
         // Check if code is empty
         if (string.IsNullOrEmpty(enteredCode))
@@ -457,17 +508,21 @@ public class TicketAccessGate : MonoBehaviour
 
         if (enteredCode.Equals(correctCode, System.StringComparison.OrdinalIgnoreCase))
         {
+            isProcessingAccess = true;
             ShowFeedback("✓ Verified! Loading...", true);
             
             if (gateBlocker != null)
                 gateBlocker.SetActive(false);
 
+            Debug.Log($"TicketAccessGate: Code correct! Loading scene {targetSceneIndex}");
+            
             // Load scene asynchronously (prevents freeze on mobile)
             SceneManager.LoadSceneAsync(targetSceneIndex);
         }
         else
         {
             ShowFeedback("✗ Invalid code. Try again.", false);
+            Debug.Log($"TicketAccessGate: Code incorrect. Expected: {correctCode}");
             
             // Clear the input field for retry
             codeInputField.text = "";
@@ -483,6 +538,10 @@ public class TicketAccessGate : MonoBehaviour
             playerNearby = true;
             popupPanel.SetActive(true);
             
+            // Reset all state flags
+            isProcessingAccess = false;
+            lastAccessAttemptTime = 0f;
+            
             // Reset the UI state
             if (feedbackText != null)
             {
@@ -497,6 +556,8 @@ public class TicketAccessGate : MonoBehaviour
                 codeInputField.Select();
                 codeInputField.ActivateInputField();
             }
+            
+            Debug.Log("TicketAccessGate: Player entered, popup activated");
         }
     }
 
@@ -506,15 +567,6 @@ public class TicketAccessGate : MonoBehaviour
         {
             playerNearby = false;
             popupPanel.SetActive(false);
-        }
-    }
-    
-    void OnDestroy()
-    {
-        // Clean up button listener to prevent memory leaks
-        if (submitButton != null)
-        {
-            submitButton.onClick.RemoveListener(TryAccess);
         }
     }
 }
