@@ -43,6 +43,9 @@ public class TicketAccessGate : MonoBehaviour
     // Reference to joystick - we need to disable it when popup is open
     private Joystick joystickToDisable = null;
     private CanvasGroup joystickCanvasGroup = null;
+    
+    // TouchScreenKeyboard for iOS manual keyboard handling
+    private TouchScreenKeyboard mobileKeyboard = null;
 
     /// <summary>
     /// Called when the script becomes enabled - handles scene transitions
@@ -381,6 +384,14 @@ public class TicketAccessGate : MonoBehaviour
         // Configure input field settings
         codeInputField.characterLimit = 20;
         codeInputField.contentType = TMP_InputField.ContentType.Alphanumeric;
+        codeInputField.keyboardType = TouchScreenKeyboardType.Default;
+        
+        // iOS-specific settings
+        #if UNITY_IOS || UNITY_ANDROID
+        // shouldHideMobileInput = false shows the native input field which works better on iOS
+        codeInputField.shouldHideMobileInput = false;
+        Debug.Log("TicketAccessGate: Configured input field for mobile (shouldHideMobileInput=false)");
+        #endif
         
         // Make the entire input field touchable
         MakeInputFieldFullyTouchable();
@@ -549,6 +560,27 @@ public class TicketAccessGate : MonoBehaviour
         // Safety check
         if (popupPanel == null) return;
         
+        // Sync text from manually opened TouchScreenKeyboard (iOS)
+        #if UNITY_IOS || UNITY_ANDROID
+        if (mobileKeyboard != null && mobileKeyboard.status == TouchScreenKeyboard.Status.Visible)
+        {
+            if (codeInputField != null && codeInputField.text != mobileKeyboard.text)
+            {
+                codeInputField.text = mobileKeyboard.text;
+            }
+        }
+        // Check if keyboard was closed with Done button
+        if (mobileKeyboard != null && mobileKeyboard.status == TouchScreenKeyboard.Status.Done)
+        {
+            if (codeInputField != null)
+            {
+                codeInputField.text = mobileKeyboard.text;
+            }
+            mobileKeyboard = null;
+            TryAccess();  // Auto-submit when Done is pressed
+        }
+        #endif
+        
         // If player nearby and pressed Enter
         if (playerNearby && Input.GetKeyDown(KeyCode.Return))
         {
@@ -656,11 +688,13 @@ public class TicketAccessGate : MonoBehaviour
     {
         if (codeInputField == null) return;
         
+        Debug.Log("TicketAccessGate: ActivateInputFieldSafe called");
+        
         // CRITICAL: Ensure EventSystem exists and is working
         EnsureEventSystemExists();
         
         // Stop any pending activation coroutines
-        StopCoroutine("ActivateInputFieldCoroutine");
+        StopAllCoroutines();
         
         // Start robust activation sequence
         StartCoroutine(ActivateInputFieldCoroutine());
@@ -668,9 +702,12 @@ public class TicketAccessGate : MonoBehaviour
 
     /// <summary>
     /// Robust coroutine to activate input field on iOS - handles scene transition issues
+    /// Uses multiple methods to ensure keyboard opens
     /// </summary>
     System.Collections.IEnumerator ActivateInputFieldCoroutine()
     {
+        Debug.Log("TicketAccessGate: Starting input field activation coroutine");
+        
         // Wait one frame for any pending UI updates
         yield return null;
         
@@ -686,33 +723,82 @@ public class TicketAccessGate : MonoBehaviour
         if (EventSystem.current == null)
         {
             Debug.LogError("TicketAccessGate: No EventSystem available for keyboard!");
-            yield break;
+            // Try to create one
+            GameObject esGO = new GameObject("EventSystem_Emergency");
+            esGO.AddComponent<EventSystem>();
+            esGO.AddComponent<StandaloneInputModule>();
+            yield return null;
         }
         
         // STEP 2: Clear current selection (force reset)
-        EventSystem.current.SetSelectedGameObject(null);
+        if (EventSystem.current != null)
+        {
+            EventSystem.current.SetSelectedGameObject(null);
+        }
         yield return null;
         
-        // STEP 3: Make sure input field is interactable
+        // STEP 3: Make sure input field is interactable and enabled
         codeInputField.interactable = true;
+        codeInputField.enabled = false;
+        yield return null;
+        codeInputField.enabled = true;
+        yield return null;
         
-        // STEP 4: Select and activate the input field
-        EventSystem.current.SetSelectedGameObject(codeInputField.gameObject);
+        // STEP 4: Select and activate the input field using multiple methods
+        if (EventSystem.current != null)
+        {
+            EventSystem.current.SetSelectedGameObject(codeInputField.gameObject);
+        }
         codeInputField.Select();
         codeInputField.ActivateInputField();
         
-        inputFieldWasSelected = true;
-        Debug.Log("TicketAccessGate: Input field activated - keyboard should appear");
+        Debug.Log($"TicketAccessGate: Input field activated. isFocused={codeInputField.isFocused}");
         
-        // STEP 5: Double-check activation after a short delay (iOS sometimes needs this)
+        // STEP 5: For iOS - use TouchScreenKeyboard directly if needed
+        #if UNITY_IOS || UNITY_ANDROID
+        yield return new WaitForSeconds(0.15f);
+        
+        if (codeInputField != null && popupPanel != null && popupPanel.activeSelf)
+        {
+            if (!codeInputField.isFocused || !TouchScreenKeyboard.visible)
+            {
+                Debug.Log("TicketAccessGate: Keyboard not visible, opening manually");
+                
+                // Force focus again
+                codeInputField.Select();
+                codeInputField.ActivateInputField();
+                
+                // If still no keyboard, try opening it directly
+                yield return new WaitForSeconds(0.1f);
+                if (!TouchScreenKeyboard.visible && codeInputField != null)
+                {
+                    Debug.Log("TicketAccessGate: Opening TouchScreenKeyboard directly");
+                    mobileKeyboard = TouchScreenKeyboard.Open(
+                        codeInputField.text, 
+                        TouchScreenKeyboardType.Default, 
+                        false,  // autocorrection
+                        false,  // multiline
+                        false,  // secure
+                        false,  // alert
+                        "Enter access code",  // placeholder
+                        50      // max length
+                    );
+                }
+            }
+        }
+        #else
+        // For editor/desktop, just retry activation
         yield return new WaitForSeconds(0.1f);
-        
         if (codeInputField != null && popupPanel != null && popupPanel.activeSelf && !codeInputField.isFocused)
         {
             Debug.Log("TicketAccessGate: Re-activating input field (was not focused)");
             codeInputField.Select();
             codeInputField.ActivateInputField();
         }
+        #endif
+        
+        inputFieldWasSelected = true;
+        Debug.Log($"TicketAccessGate: Activation complete. isFocused={codeInputField?.isFocused}, keyboard visible={TouchScreenKeyboard.visible}");
     }
 
     /// <summary>
@@ -912,7 +998,16 @@ public class TicketAccessGate : MonoBehaviour
             if (codeInputField != null)
             {
                 codeInputField.DeactivateInputField();
+                codeInputField.text = "";  // Clear text for next time
             }
+            
+            // Clean up mobile keyboard reference
+            #if UNITY_IOS || UNITY_ANDROID
+            if (mobileKeyboard != null)
+            {
+                mobileKeyboard = null;
+            }
+            #endif
             
             // Clear EventSystem selection
             if (EventSystem.current != null)
