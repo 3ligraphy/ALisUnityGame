@@ -38,6 +38,37 @@ public class TicketAccessGate : MonoBehaviour
     private bool isProcessingAccess = false;  // Prevent double-triggering
     private float lastAccessAttemptTime = 0f;  // Cooldown for access attempts
     private bool inputFieldWasSelected = false;  // Track if input field was ever selected
+    private bool hasInitialized = false;  // Track if Start() has run
+    
+    // Reference to joystick - we need to disable it when popup is open
+    private Joystick joystickToDisable = null;
+    private CanvasGroup joystickCanvasGroup = null;
+
+    /// <summary>
+    /// Called when the script becomes enabled - handles scene transitions
+    /// </summary>
+    void OnEnable()
+    {
+        // Reset state flags when re-enabled (scene transitions)
+        playerNearby = false;
+        isProcessingAccess = false;
+        lastAccessAttemptTime = 0f;
+        inputFieldWasSelected = false;
+        
+        // If already initialized (not first run), re-setup critical components
+        if (hasInitialized)
+        {
+            Debug.Log("TicketAccessGate: OnEnable - Re-initializing after scene transition");
+            EnsureEventSystemExists();
+            FindPlayerController();
+            FindSubmitButton();
+            
+            // Re-find joystick for this scene (old reference may be stale)
+            joystickToDisable = null;
+            joystickCanvasGroup = null;
+            FindJoystick();
+        }
+    }
 
     void Start()
     {
@@ -55,11 +86,18 @@ public class TicketAccessGate : MonoBehaviour
         // Find the submit button if not assigned
         FindSubmitButton();
         
+        // Find joystick so we can disable it when popup is open
+        FindJoystick();
+        
         // Configure popup panel to be centered and not full-screen
         ConfigurePopupPanel();
         
         // Configure and style UI elements for mobile
         ConfigureUIForMobile();
+        
+        // Mark as initialized
+        hasInitialized = true;
+        Debug.Log("TicketAccessGate: Initialized successfully");
     }
 
     /// <summary>
@@ -67,17 +105,37 @@ public class TicketAccessGate : MonoBehaviour
     /// </summary>
     void EnsureEventSystemExists()
     {
-        if (EventSystem.current == null)
+        // Check if EventSystem.current is valid
+        EventSystem currentES = EventSystem.current;
+        
+        if (currentES == null)
         {
-            // Try to find an existing EventSystem
+            // Try to find an existing EventSystem in the scene
             EventSystem existingES = FindObjectOfType<EventSystem>();
-            if (existingES == null)
+            
+            if (existingES != null)
             {
-                // Create one if none exists
-                GameObject eventSystemGO = new GameObject("EventSystem");
-                eventSystemGO.AddComponent<EventSystem>();
+                // Found one but it's not set as current - this can happen after scene transition
+                Debug.Log("TicketAccessGate: Found existing EventSystem, ensuring it's active");
+                existingES.gameObject.SetActive(false);
+                existingES.gameObject.SetActive(true);
+            }
+            else
+            {
+                // No EventSystem exists - create one
+                GameObject eventSystemGO = new GameObject("EventSystem_TicketGate");
+                EventSystem newES = eventSystemGO.AddComponent<EventSystem>();
                 eventSystemGO.AddComponent<StandaloneInputModule>();
-                Debug.Log("TicketAccessGate: Created EventSystem for UI input");
+                Debug.Log("TicketAccessGate: Created new EventSystem for UI input");
+            }
+        }
+        else
+        {
+            // Ensure the current EventSystem is enabled
+            if (!currentES.gameObject.activeInHierarchy)
+            {
+                currentES.gameObject.SetActive(true);
+                Debug.Log("TicketAccessGate: Re-enabled inactive EventSystem");
             }
         }
     }
@@ -103,20 +161,72 @@ public class TicketAccessGate : MonoBehaviour
 
     /// <summary>
     /// Notifies the player controller that UI is open/closed
+    /// Also disables/enables the joystick to prevent it from capturing touches
     /// Returns true if successful, false if player controller not found
     /// </summary>
     bool SetPlayerUIState(bool isOpen)
     {
+        // CRITICAL: Disable/enable joystick to prevent it from capturing touches
+        SetJoystickInteractable(!isOpen);
+        
         if (playerController != null)
         {
             playerController.SetUIOpen(isOpen);
-            Debug.Log($"TicketAccessGate: Set player UI state to {isOpen}");
+            Debug.Log($"TicketAccessGate: Set player UI state to {isOpen}, joystick interactable: {!isOpen}");
             return true;
         }
         else
         {
             Debug.LogError($"TicketAccessGate: playerController is NULL! Cannot set UI state to {isOpen}");
             return false;
+        }
+    }
+    
+    /// <summary>
+    /// Finds the joystick in the scene and stores reference for later control
+    /// </summary>
+    void FindJoystick()
+    {
+        if (joystickToDisable == null)
+        {
+            joystickToDisable = FindObjectOfType<Joystick>();
+            if (joystickToDisable != null)
+            {
+                // Get or add a CanvasGroup to control interactability
+                joystickCanvasGroup = joystickToDisable.GetComponent<CanvasGroup>();
+                if (joystickCanvasGroup == null)
+                {
+                    joystickCanvasGroup = joystickToDisable.gameObject.AddComponent<CanvasGroup>();
+                }
+                Debug.Log("TicketAccessGate: Found joystick for control");
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Enables or disables the joystick's ability to receive touches
+    /// This is CRITICAL - the joystick's IPointerDownHandler intercepts touches meant for the input field
+    /// </summary>
+    void SetJoystickInteractable(bool interactable)
+    {
+        // Always try to find joystick if we don't have a reference
+        if (joystickToDisable == null)
+        {
+            FindJoystick();
+        }
+        
+        if (joystickCanvasGroup != null)
+        {
+            // CanvasGroup.blocksRaycasts controls whether this UI element receives touch events
+            joystickCanvasGroup.blocksRaycasts = interactable;
+            joystickCanvasGroup.interactable = interactable;
+            Debug.Log($"TicketAccessGate: Joystick interactable set to {interactable}");
+        }
+        else if (joystickToDisable != null)
+        {
+            // Fallback: disable the entire joystick GameObject
+            joystickToDisable.gameObject.SetActive(interactable);
+            Debug.Log($"TicketAccessGate: Joystick GameObject active set to {interactable}");
         }
     }
 
@@ -546,40 +656,62 @@ public class TicketAccessGate : MonoBehaviour
     {
         if (codeInputField == null) return;
         
-        // Ensure EventSystem is active
-        if (EventSystem.current != null)
-        {
-            EventSystem.current.SetSelectedGameObject(codeInputField.gameObject);
-        }
+        // CRITICAL: Ensure EventSystem exists and is working
+        EnsureEventSystemExists();
         
-        // Clear any existing selection first, then reselect
-        codeInputField.DeactivateInputField();
+        // Stop any pending activation coroutines
+        StopCoroutine("ActivateInputFieldCoroutine");
         
-        // Wait a frame then activate (iOS needs this delay sometimes)
-        StartCoroutine(ActivateInputFieldNextFrame());
+        // Start robust activation sequence
+        StartCoroutine(ActivateInputFieldCoroutine());
     }
 
     /// <summary>
-    /// Activates input field on the next frame - helps with iOS keyboard issues
+    /// Robust coroutine to activate input field on iOS - handles scene transition issues
     /// </summary>
-    System.Collections.IEnumerator ActivateInputFieldNextFrame()
+    System.Collections.IEnumerator ActivateInputFieldCoroutine()
     {
-        yield return null;  // Wait one frame
+        // Wait one frame for any pending UI updates
+        yield return null;
         
-        if (codeInputField != null && popupPanel != null && popupPanel.activeSelf)
+        if (codeInputField == null || popupPanel == null || !popupPanel.activeSelf)
         {
+            Debug.Log("TicketAccessGate: Activation cancelled - popup not active");
+            yield break;
+        }
+        
+        // STEP 1: Ensure EventSystem is ready
+        EnsureEventSystemExists();
+        
+        if (EventSystem.current == null)
+        {
+            Debug.LogError("TicketAccessGate: No EventSystem available for keyboard!");
+            yield break;
+        }
+        
+        // STEP 2: Clear current selection (force reset)
+        EventSystem.current.SetSelectedGameObject(null);
+        yield return null;
+        
+        // STEP 3: Make sure input field is interactable
+        codeInputField.interactable = true;
+        
+        // STEP 4: Select and activate the input field
+        EventSystem.current.SetSelectedGameObject(codeInputField.gameObject);
+        codeInputField.Select();
+        codeInputField.ActivateInputField();
+        
+        inputFieldWasSelected = true;
+        Debug.Log("TicketAccessGate: Input field activated - keyboard should appear");
+        
+        // STEP 5: Double-check activation after a short delay (iOS sometimes needs this)
+        yield return new WaitForSeconds(0.1f);
+        
+        if (codeInputField != null && popupPanel != null && popupPanel.activeSelf && !codeInputField.isFocused)
+        {
+            Debug.Log("TicketAccessGate: Re-activating input field (was not focused)");
             codeInputField.Select();
             codeInputField.ActivateInputField();
-            
-            // Force the keyboard to show by also using interactable toggle
-            codeInputField.interactable = false;
-            yield return null;
-            codeInputField.interactable = true;
-            codeInputField.Select();
-            codeInputField.ActivateInputField();
-            
-            inputFieldWasSelected = true;
-            Debug.Log("TicketAccessGate: Input field activated via NextFrame coroutine");
         }
     }
 
@@ -710,11 +842,12 @@ public class TicketAccessGate : MonoBehaviour
                     EventSystem.current.SetSelectedGameObject(null);
                 }
                 
-                // Auto-focus the input field for better UX - delay for iOS
-                StartCoroutine(DelayedInputFieldFocus());
+                // DO NOT auto-focus - let user tap to open keyboard
+                // This prevents unwanted keyboard popup and iOS issues
+                // The user will tap the input field to open keyboard
             }
             
-            Debug.Log("TicketAccessGate: Player entered, popup activated");
+            Debug.Log("TicketAccessGate: Player entered, popup activated - tap input field to type");
         }
     }
 
@@ -813,10 +946,10 @@ public class TicketAccessGate : MonoBehaviour
             EventSystem.current.SetSelectedGameObject(null);
         }
         
-        // Re-enable player movement if popup was open
-        if (playerNearby)
-        {
-            SetPlayerUIState(false);
-        }
+        // Re-enable player movement and joystick
+        SetPlayerUIState(false);
+        
+        // Extra safety: always ensure joystick is re-enabled when this script is disabled
+        SetJoystickInteractable(true);
     }
 }
