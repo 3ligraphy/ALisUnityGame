@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.SceneManagement;
+using UnityEngine.EventSystems;
 
 public class TicketAccessGate : MonoBehaviour
 {
@@ -36,12 +37,17 @@ public class TicketAccessGate : MonoBehaviour
     private bool playerNearby = false;
     private bool isProcessingAccess = false;  // Prevent double-triggering
     private float lastAccessAttemptTime = 0f;  // Cooldown for access attempts
+    private bool inputFieldWasSelected = false;  // Track if input field was ever selected
 
     void Start()
     {
-        popupPanel.SetActive(false);
+        if (popupPanel != null)
+            popupPanel.SetActive(false);
         if (feedbackText != null)
             feedbackText.text = "";
+        
+        // Ensure EventSystem exists - CRITICAL for iOS keyboard
+        EnsureEventSystemExists();
         
         // Find the player controller if not assigned
         FindPlayerController();
@@ -54,6 +60,26 @@ public class TicketAccessGate : MonoBehaviour
         
         // Configure and style UI elements for mobile
         ConfigureUIForMobile();
+    }
+
+    /// <summary>
+    /// Ensures an EventSystem exists in the scene - required for keyboard on iOS
+    /// </summary>
+    void EnsureEventSystemExists()
+    {
+        if (EventSystem.current == null)
+        {
+            // Try to find an existing EventSystem
+            EventSystem existingES = FindObjectOfType<EventSystem>();
+            if (existingES == null)
+            {
+                // Create one if none exists
+                GameObject eventSystemGO = new GameObject("EventSystem");
+                eventSystemGO.AddComponent<EventSystem>();
+                eventSystemGO.AddComponent<StandaloneInputModule>();
+                Debug.Log("TicketAccessGate: Created EventSystem for UI input");
+            }
+        }
     }
 
     /// <summary>
@@ -77,13 +103,20 @@ public class TicketAccessGate : MonoBehaviour
 
     /// <summary>
     /// Notifies the player controller that UI is open/closed
+    /// Returns true if successful, false if player controller not found
     /// </summary>
-    void SetPlayerUIState(bool isOpen)
+    bool SetPlayerUIState(bool isOpen)
     {
         if (playerController != null)
         {
             playerController.SetUIOpen(isOpen);
             Debug.Log($"TicketAccessGate: Set player UI state to {isOpen}");
+            return true;
+        }
+        else
+        {
+            Debug.LogError($"TicketAccessGate: playerController is NULL! Cannot set UI state to {isOpen}");
+            return false;
         }
     }
 
@@ -490,9 +523,8 @@ public class TicketAccessGate : MonoBehaviour
                 // Check if touch is within the input field area
                 if (IsTouchOverInputField(touch.position))
                 {
-                    // Activate the input field
-                    codeInputField.Select();
-                    codeInputField.ActivateInputField();
+                    Debug.Log("TicketAccessGate: Touch detected on input field");
+                    ActivateInputFieldSafe();
                 }
             }
         }
@@ -501,9 +533,53 @@ public class TicketAccessGate : MonoBehaviour
         {
             if (IsTouchOverInputField(Input.mousePosition))
             {
-                codeInputField.Select();
-                codeInputField.ActivateInputField();
+                Debug.Log("TicketAccessGate: Mouse click detected on input field");
+                ActivateInputFieldSafe();
             }
+        }
+    }
+
+    /// <summary>
+    /// Safely activates the input field with proper EventSystem handling for iOS
+    /// </summary>
+    void ActivateInputFieldSafe()
+    {
+        if (codeInputField == null) return;
+        
+        // Ensure EventSystem is active
+        if (EventSystem.current != null)
+        {
+            EventSystem.current.SetSelectedGameObject(codeInputField.gameObject);
+        }
+        
+        // Clear any existing selection first, then reselect
+        codeInputField.DeactivateInputField();
+        
+        // Wait a frame then activate (iOS needs this delay sometimes)
+        StartCoroutine(ActivateInputFieldNextFrame());
+    }
+
+    /// <summary>
+    /// Activates input field on the next frame - helps with iOS keyboard issues
+    /// </summary>
+    System.Collections.IEnumerator ActivateInputFieldNextFrame()
+    {
+        yield return null;  // Wait one frame
+        
+        if (codeInputField != null && popupPanel != null && popupPanel.activeSelf)
+        {
+            codeInputField.Select();
+            codeInputField.ActivateInputField();
+            
+            // Force the keyboard to show by also using interactable toggle
+            codeInputField.interactable = false;
+            yield return null;
+            codeInputField.interactable = true;
+            codeInputField.Select();
+            codeInputField.ActivateInputField();
+            
+            inputFieldWasSelected = true;
+            Debug.Log("TicketAccessGate: Input field activated via NextFrame coroutine");
         }
     }
 
@@ -584,14 +660,36 @@ public class TicketAccessGate : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             playerNearby = true;
+            
+            // Safety check for popup panel
+            if (popupPanel == null)
+            {
+                Debug.LogError("TicketAccessGate: popupPanel is null!");
+                return;
+            }
+            
+            // CRITICAL: Re-find player controller EVERY time popup opens
+            // This handles scene transitions where the old reference becomes invalid
+            FindPlayerControllerNow();
+            
+            // Ensure EventSystem exists BEFORE showing popup
+            EnsureEventSystemExists();
+            
             popupPanel.SetActive(true);
             
             // CRITICAL: Tell player controller that UI is open to stop touch processing
-            SetPlayerUIState(true);
+            if (!SetPlayerUIState(true))
+            {
+                Debug.LogWarning("TicketAccessGate: Could not disable player input - player may move while typing!");
+            }
             
             // Reset all state flags
             isProcessingAccess = false;
             lastAccessAttemptTime = 0f;
+            inputFieldWasSelected = false;
+            
+            // Stop all existing coroutines to prevent conflicts
+            StopAllCoroutines();
             
             // Reset the UI state
             if (feedbackText != null)
@@ -603,11 +701,42 @@ public class TicketAccessGate : MonoBehaviour
             if (codeInputField != null)
             {
                 codeInputField.text = "";
-                // Auto-focus the input field for better UX - delay slightly for iOS
+                codeInputField.interactable = true;
+                
+                // Ensure the input field is ready to receive input
+                if (EventSystem.current != null)
+                {
+                    // Clear any existing selection first
+                    EventSystem.current.SetSelectedGameObject(null);
+                }
+                
+                // Auto-focus the input field for better UX - delay for iOS
                 StartCoroutine(DelayedInputFieldFocus());
             }
             
-            Debug.Log("TicketAccessGate: Player entered, popup activated, player movement disabled");
+            Debug.Log("TicketAccessGate: Player entered, popup activated");
+        }
+    }
+
+    /// <summary>
+    /// Finds the player controller immediately - called every time popup opens
+    /// to handle scene transitions where the old reference becomes invalid
+    /// </summary>
+    void FindPlayerControllerNow()
+    {
+        // Always search for the player controller, even if we have a reference
+        // because the old reference might be from a destroyed object
+        FirstPersonController foundController = FindObjectOfType<FirstPersonController>();
+        
+        if (foundController != null)
+        {
+            playerController = foundController;
+            Debug.Log("TicketAccessGate: Found FirstPersonController for this scene");
+        }
+        else
+        {
+            playerController = null;
+            Debug.LogError("TicketAccessGate: NO FirstPersonController found in scene! Player will move while popup is open!");
         }
     }
 
@@ -616,11 +745,24 @@ public class TicketAccessGate : MonoBehaviour
     /// </summary>
     System.Collections.IEnumerator DelayedInputFieldFocus()
     {
-        yield return null; // Wait one frame
-        if (codeInputField != null && popupPanel.activeSelf)
+        // Wait multiple frames for iOS to fully set up the UI
+        yield return null;
+        yield return null;
+        yield return new WaitForSeconds(0.1f);
+        
+        if (codeInputField != null && popupPanel != null && popupPanel.activeSelf)
         {
+            // Ensure EventSystem knows about our input field
+            if (EventSystem.current != null)
+            {
+                EventSystem.current.SetSelectedGameObject(codeInputField.gameObject);
+            }
+            
             codeInputField.Select();
             codeInputField.ActivateInputField();
+            inputFieldWasSelected = true;
+            
+            Debug.Log("TicketAccessGate: Input field focused after delay (iOS-safe)");
         }
     }
 
@@ -629,12 +771,52 @@ public class TicketAccessGate : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             playerNearby = false;
-            popupPanel.SetActive(false);
+            
+            // Stop any pending coroutines
+            StopAllCoroutines();
+            
+            // Deactivate input field to hide keyboard
+            if (codeInputField != null)
+            {
+                codeInputField.DeactivateInputField();
+            }
+            
+            // Clear EventSystem selection
+            if (EventSystem.current != null)
+            {
+                EventSystem.current.SetSelectedGameObject(null);
+            }
+            
+            if (popupPanel != null)
+                popupPanel.SetActive(false);
             
             // Re-enable player movement
             SetPlayerUIState(false);
             
-            Debug.Log("TicketAccessGate: Player exited, popup closed, player movement enabled");
+            // Reset state
+            inputFieldWasSelected = false;
+            
+            Debug.Log("TicketAccessGate: Player exited, popup closed");
+        }
+    }
+
+    /// <summary>
+    /// Called when the script is disabled or destroyed
+    /// </summary>
+    void OnDisable()
+    {
+        StopAllCoroutines();
+        
+        // Clean up UI state
+        if (EventSystem.current != null)
+        {
+            EventSystem.current.SetSelectedGameObject(null);
+        }
+        
+        // Re-enable player movement if popup was open
+        if (playerNearby)
+        {
+            SetPlayerUIState(false);
         }
     }
 }

@@ -34,10 +34,10 @@ public class BuildScript
         // Configure company and product names for App Store compliance
         PlayerSettings.companyName = "Failaka Games";
         PlayerSettings.productName = "Failaka Island";
-        PlayerSettings.bundleVersion = "1.0.8";  // Eighth submission - Fixed popup crash, joystick works while popup open, proper UI state management
+        PlayerSettings.bundleVersion = "1.0.9";  // Ninth submission - Fixed keyboard not opening after scene change, auto-detect active popups
         Debug.Log("✅ Set company: Failaka Games");
         Debug.Log("✅ Set product: Failaka Island");
-        Debug.Log("✅ Set version: 1.0.8");
+        Debug.Log("✅ Set version: 1.0.9");
 
     // Set app icon automatically
     string iconPath = "Assets/AppIcon.png";
