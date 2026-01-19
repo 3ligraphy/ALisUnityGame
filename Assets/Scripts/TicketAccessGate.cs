@@ -54,7 +54,52 @@ public class TicketAccessGate : MonoBehaviour
         if (submitButton == null && popupPanel != null)
         {
             // Try to find a button in the popup panel
-            submitButton = popupPanel.GetComponentInChildren<Button>();
+            submitButton = popupPanel.GetComponentInChildren<Button>(true); // include inactive
+            
+            // If still null, try to find by common names
+            if (submitButton == null)
+            {
+                Transform buttonTransform = popupPanel.transform.Find("Button");
+                if (buttonTransform == null) buttonTransform = popupPanel.transform.Find("Go");
+                if (buttonTransform == null) buttonTransform = popupPanel.transform.Find("Submit");
+                if (buttonTransform == null) buttonTransform = popupPanel.transform.Find("Go Button");
+                
+                if (buttonTransform != null)
+                {
+                    submitButton = buttonTransform.GetComponent<Button>();
+                }
+            }
+        }
+        
+        // CRITICAL: Connect the button's onClick to TryAccess
+        if (submitButton != null)
+        {
+            // Remove any existing listeners to avoid duplicates
+            submitButton.onClick.RemoveAllListeners();
+            // Add our TryAccess method as the click handler
+            submitButton.onClick.AddListener(TryAccess);
+            Debug.Log($"TicketAccessGate: Submit button '{submitButton.gameObject.name}' connected to TryAccess()");
+            
+            // Also ensure the button is interactable
+            submitButton.interactable = true;
+            
+            // Ensure button has raycast target
+            UnityEngine.UI.Image buttonImage = submitButton.GetComponent<UnityEngine.UI.Image>();
+            if (buttonImage != null)
+            {
+                buttonImage.raycastTarget = true;
+            }
+        }
+        else
+        {
+            Debug.LogError("TicketAccessGate: NO SUBMIT BUTTON FOUND! Listing all children:");
+            if (popupPanel != null)
+            {
+                foreach (Transform child in popupPanel.transform)
+                {
+                    Debug.Log($"  Child: {child.name} - Has Button: {child.GetComponent<Button>() != null}");
+                }
+            }
         }
     }
 
@@ -461,6 +506,15 @@ public class TicketAccessGate : MonoBehaviour
         {
             playerNearby = false;
             popupPanel.SetActive(false);
+        }
+    }
+    
+    void OnDestroy()
+    {
+        // Clean up button listener to prevent memory leaks
+        if (submitButton != null)
+        {
+            submitButton.onClick.RemoveListener(TryAccess);
         }
     }
 }
