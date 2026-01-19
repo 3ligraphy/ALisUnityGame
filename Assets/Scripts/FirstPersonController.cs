@@ -64,16 +64,20 @@ public class FirstPersonController : MonoBehaviour
 
     void Update()
     {
-        // If popup is open, stop all movement and look
+        // ALWAYS allow movement (so player can walk away from popup)
+        HandleMovement();
+        
+        // If popup/UI is open, only disable camera rotation (not movement)
         if (uiOpen)
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-            lookTouchId = -1;  // Reset look touch
+            lookTouchId = -1;  // Reset look touch - no camera rotation while UI open
+            // Skip camera look and jump, but movement still works above
             return;
         }
 
-        HandleMovement();
+        // Only process camera look when UI is NOT open
         HandleTouchLook();
         HandleMouseLook();  // For desktop/editor testing
         HandleJump();

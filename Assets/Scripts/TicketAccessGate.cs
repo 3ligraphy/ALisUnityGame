@@ -13,6 +13,10 @@ public class TicketAccessGate : MonoBehaviour
     public TMP_Text feedbackText;               // رسالة الخطأ أو النجاح
     public GameObject gateBlocker;              // جسم يمنع المرور (مثلاً باب أو Collider)
     public Button submitButton;                 // زر الإرسال (Go button)
+    
+    [Header("Player Controller Reference")]
+    [Tooltip("Reference to FirstPersonController to disable movement when popup is open")]
+    public FirstPersonController playerController;
 
     [Header("Popup Size Settings")]
     [Tooltip("Width of the popup panel (0 = use default 600)")]
@@ -36,7 +40,11 @@ public class TicketAccessGate : MonoBehaviour
     void Start()
     {
         popupPanel.SetActive(false);
-        feedbackText.text = "";
+        if (feedbackText != null)
+            feedbackText.text = "";
+        
+        // Find the player controller if not assigned
+        FindPlayerController();
         
         // Find the submit button if not assigned
         FindSubmitButton();
@@ -46,6 +54,37 @@ public class TicketAccessGate : MonoBehaviour
         
         // Configure and style UI elements for mobile
         ConfigureUIForMobile();
+    }
+
+    /// <summary>
+    /// Finds the FirstPersonController to disable movement when popup is open
+    /// </summary>
+    void FindPlayerController()
+    {
+        if (playerController == null)
+        {
+            playerController = FindObjectOfType<FirstPersonController>();
+            if (playerController != null)
+            {
+                Debug.Log("TicketAccessGate: Found FirstPersonController automatically");
+            }
+            else
+            {
+                Debug.LogWarning("TicketAccessGate: No FirstPersonController found - touch input may conflict!");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Notifies the player controller that UI is open/closed
+    /// </summary>
+    void SetPlayerUIState(bool isOpen)
+    {
+        if (playerController != null)
+        {
+            playerController.SetUIOpen(isOpen);
+            Debug.Log($"TicketAccessGate: Set player UI state to {isOpen}");
+        }
     }
 
     /// <summary>
@@ -218,7 +257,7 @@ public class TicketAccessGate : MonoBehaviour
             inputImage.raycastTarget = true;
         }
         
-        // Configure Text Area child
+        // Configure Text Area child - DO NOT add components at runtime (causes iOS crashes)
         Transform textArea = codeInputField.transform.Find("Text Area");
         if (textArea != null)
         {
@@ -232,14 +271,13 @@ public class TicketAccessGate : MonoBehaviour
                 textAreaRect.offsetMax = new Vector2(-10, -5);
             }
             
-            // Add invisible image for touch detection
+            // Only configure existing Image component, don't add new ones
             Image textAreaImage = textArea.GetComponent<Image>();
-            if (textAreaImage == null)
+            if (textAreaImage != null)
             {
-                textAreaImage = textArea.gameObject.AddComponent<Image>();
+                textAreaImage.color = new Color(0, 0, 0, 0);
+                textAreaImage.raycastTarget = true;
             }
-            textAreaImage.color = new Color(0, 0, 0, 0);
-            textAreaImage.raycastTarget = true;
         }
     }
 
@@ -365,6 +403,9 @@ public class TicketAccessGate : MonoBehaviour
 
     void Update()
     {
+        // Safety check
+        if (popupPanel == null) return;
+        
         // If player nearby and pressed Enter
         if (playerNearby && Input.GetKeyDown(KeyCode.Return))
         {
@@ -374,8 +415,15 @@ public class TicketAccessGate : MonoBehaviour
         // Handle touch input for iOS - activate input field and button when touched
         if (playerNearby && popupPanel.activeSelf)
         {
-            HandleTouchInput();
-            HandleButtonTouchFallback();
+            try
+            {
+                HandleTouchInput();
+                HandleButtonTouchFallback();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"TicketAccessGate: Touch handling error: {e.Message}");
+            }
         }
     }
 
@@ -538,6 +586,9 @@ public class TicketAccessGate : MonoBehaviour
             playerNearby = true;
             popupPanel.SetActive(true);
             
+            // CRITICAL: Tell player controller that UI is open to stop touch processing
+            SetPlayerUIState(true);
+            
             // Reset all state flags
             isProcessingAccess = false;
             lastAccessAttemptTime = 0f;
@@ -552,12 +603,24 @@ public class TicketAccessGate : MonoBehaviour
             if (codeInputField != null)
             {
                 codeInputField.text = "";
-                // Auto-focus the input field for better UX
-                codeInputField.Select();
-                codeInputField.ActivateInputField();
+                // Auto-focus the input field for better UX - delay slightly for iOS
+                StartCoroutine(DelayedInputFieldFocus());
             }
             
-            Debug.Log("TicketAccessGate: Player entered, popup activated");
+            Debug.Log("TicketAccessGate: Player entered, popup activated, player movement disabled");
+        }
+    }
+
+    /// <summary>
+    /// Delays input field focus slightly to ensure it works on iOS
+    /// </summary>
+    System.Collections.IEnumerator DelayedInputFieldFocus()
+    {
+        yield return null; // Wait one frame
+        if (codeInputField != null && popupPanel.activeSelf)
+        {
+            codeInputField.Select();
+            codeInputField.ActivateInputField();
         }
     }
 
@@ -567,6 +630,11 @@ public class TicketAccessGate : MonoBehaviour
         {
             playerNearby = false;
             popupPanel.SetActive(false);
+            
+            // Re-enable player movement
+            SetPlayerUIState(false);
+            
+            Debug.Log("TicketAccessGate: Player exited, popup closed, player movement enabled");
         }
     }
 }
