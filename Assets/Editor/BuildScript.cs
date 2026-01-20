@@ -34,7 +34,7 @@ public class BuildScript
         // Configure company and product names for App Store compliance
         PlayerSettings.companyName = "Failaka Games";
         PlayerSettings.productName = "Failaka Island";
-        PlayerSettings.bundleVersion = "1.0.12";  // 12th submission - NEW: Bypass TMP_InputField, use TouchScreenKeyboard directly on iOS
+        PlayerSettings.bundleVersion = "1.0.20";  // 20th - Fix input field and GO button sizes to fit within popup
         Debug.Log("✅ Set company: Failaka Games");
         Debug.Log("✅ Set product: Failaka Island");
         Debug.Log("✅ Set version: 1.0.10");

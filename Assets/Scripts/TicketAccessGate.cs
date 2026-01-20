@@ -4,76 +4,79 @@ using TMPro;
 using UnityEngine.SceneManagement;
 using UnityEngine.EventSystems;
 
+/// <summary>
+/// Ticket Access Gate - Original popup preserved, floating numeric keypad with display
+/// </summary>
 public class TicketAccessGate : MonoBehaviour
 {
     [Header("Access Settings")]
-    public string correctCode = "GEO7X2";       // رمز التذكرة الصحيح
-    public int targetSceneIndex = 1;            // رقم المشهد اللي هينتقل له بعد التحقق
-    public GameObject popupPanel;               // البوب أب اللي فيه الإدخال
-    public TMP_InputField codeInputField;       // حقل إدخال الرمز
-    public TMP_Text feedbackText;               // رسالة الخطأ أو النجاح
-    public GameObject gateBlocker;              // جسم يمنع المرور (مثلاً باب أو Collider)
-    public Button submitButton;                 // زر الإرسال (Go button)
+    public string correctCode = "GEO7X2";
+    public int targetSceneIndex = 1;
+    public GameObject popupPanel;
+    public TMP_InputField codeInputField;
+    public TMP_Text feedbackText;
+    public GameObject gateBlocker;
+    public Button submitButton;
     
     [Header("Player Controller Reference")]
-    [Tooltip("Reference to FirstPersonController to disable movement when popup is open")]
     public FirstPersonController playerController;
 
-    [Header("Popup Size Settings")]
-    [Tooltip("Width of the popup panel (0 = use default 600)")]
-    public float popupWidth = 600f;
-    [Tooltip("Height of the popup panel (0 = use default 400)")]
-    public float popupHeight = 400f;
+    [Header("Keypad Settings")]
+    public float buttonSize = 60f;
+    public float buttonSpacing = 5f;
 
-    [Header("UI Styling")]
-    public Color inputFieldColor = new Color(1f, 1f, 1f, 1f);  // Pure white background
-    public Color inputTextColor = new Color(0.1f, 0.1f, 0.1f, 1f);  // Dark text
-    public Color placeholderColor = new Color(0.4f, 0.4f, 0.4f, 1f);  // Visible gray placeholder
-    public Color buttonColor = new Color(0.18f, 0.55f, 0.34f, 1f);  // Green button
-    public Color buttonTextColor = Color.white;
-    public Color feedbackErrorColor = new Color(0.9f, 0.2f, 0.2f, 1f);  // Red for errors
-    public Color feedbackSuccessColor = new Color(0.2f, 0.7f, 0.3f, 1f);  // Green for success
+    [Header("Keypad Colors")]
+    public Color keypadBgColor = new Color(0.12f, 0.12f, 0.15f, 0.95f);
+    public Color displayBgColor = new Color(0.05f, 0.05f, 0.08f, 1f);
+    public Color displayTextColor = new Color(0.4f, 0.9f, 0.5f, 1f);
+    public Color numberButtonColor = new Color(0.25f, 0.25f, 0.3f, 1f);
+    public Color fillButtonColor = new Color(0.2f, 0.5f, 0.35f, 1f);
+    public Color clearButtonColor = new Color(0.5f, 0.4f, 0.2f, 1f);
+    public Color deleteButtonColor = new Color(0.5f, 0.25f, 0.25f, 1f);
 
+    // Private state
     private bool playerNearby = false;
-    private bool isProcessingAccess = false;  // Prevent double-triggering
-    private float lastAccessAttemptTime = 0f;  // Cooldown for access attempts
-    private bool inputFieldWasSelected = false;  // Track if input field was ever selected
-    private bool hasInitialized = false;  // Track if Start() has run
+    private bool isProcessingAccess = false;
+    private bool hasInitialized = false;
+    private string keypadText = "";
+    private const int MAX_CODE_LENGTH = 10;
     
-    // Reference to joystick - we need to disable it when popup is open
+    // Keypad UI
+    private GameObject keypadPanel;
+    private TMP_Text keypadDisplayText;
+    private bool keypadVisible = false;
+    private Button openKeypadButton;
+    
+    // Joystick reference
     private Joystick joystickToDisable = null;
     private CanvasGroup joystickCanvasGroup = null;
-    
-    // TouchScreenKeyboard for iOS manual keyboard handling - BYPASS TMP_InputField entirely
-    private TouchScreenKeyboard mobileKeyboard = null;
-    private bool useDirectKeyboard = false;  // True on iOS/Android to bypass TMP_InputField keyboard
 
-    /// <summary>
-    /// Called when the script becomes enabled - handles scene transitions
-    /// </summary>
     void OnEnable()
     {
-        // Reset state flags when re-enabled (scene transitions)
         playerNearby = false;
         isProcessingAccess = false;
-        lastAccessAttemptTime = 0f;
-        inputFieldWasSelected = false;
+        keypadText = "";
+        keypadVisible = false;
         
-        // Clean up any stale keyboard reference
-        mobileKeyboard = null;
-        
-        // If already initialized (not first run), re-setup critical components
         if (hasInitialized)
         {
-            Debug.Log("TicketAccessGate: OnEnable - Re-initializing after scene transition");
-            EnsureEventSystemExists();
+            Debug.Log("TicketAccessGate: OnEnable - reinitializing");
+            
+            // Re-find references (they may be stale after scene load)
             FindPlayerController();
+            FindJoystick();
             FindSubmitButton();
             
-            // Re-find joystick for this scene (old reference may be stale)
-            joystickToDisable = null;
-            joystickCanvasGroup = null;
-            FindJoystick();
+            // Ensure EventSystem is active
+            EnsureEventSystem();
+            
+            // Fix popup size again
+            FixPopupSize();
+            
+            // Re-setup submit button
+            SetupOriginalSubmitButton();
+            
+            if (keypadPanel != null) keypadPanel.SetActive(false);
         }
     }
 
@@ -84,895 +87,588 @@ public class TicketAccessGate : MonoBehaviour
         if (feedbackText != null)
             feedbackText.text = "";
         
-        // Determine if we should use direct keyboard (bypass TMP_InputField on mobile)
-        #if UNITY_IOS || UNITY_ANDROID
-        useDirectKeyboard = true;
-        Debug.Log("TicketAccessGate: Using DIRECT TouchScreenKeyboard (bypassing TMP_InputField)");
-        #else
-        useDirectKeyboard = false;
-        #endif
-        
-        // Ensure EventSystem exists - CRITICAL for iOS keyboard
-        EnsureEventSystemExists();
-        
-        // Find the player controller if not assigned
         FindPlayerController();
-        
-        // Find the submit button if not assigned
+        FindJoystick();
         FindSubmitButton();
         
-        // Find joystick so we can disable it when popup is open
-        FindJoystick();
+        // FORCE fix popup size - don't rely on detection
+        FixPopupSize();
         
-        // Configure popup panel to be centered and not full-screen
-        ConfigurePopupPanel();
+        // Ensure EventSystem exists (critical for buttons to work after scene load)
+        EnsureEventSystem();
         
-        // Configure and style UI elements for mobile
-        ConfigureUIForMobile();
+        // Setup the original submit button (DON'T change its size/position)
+        SetupOriginalSubmitButton();
         
-        // Mark as initialized
+        // Create the open keypad button
+        CreateOpenKeypadButton();
+        
+        // Create keypad with display
+        CreateKeypadWithDisplay();
+        
         hasInitialized = true;
-        Debug.Log("TicketAccessGate: Initialized successfully");
-    }
-
-    /// <summary>
-    /// Ensures an EventSystem exists in the scene - required for keyboard on iOS
-    /// </summary>
-    void EnsureEventSystemExists()
-    {
-        // Check if EventSystem.current is valid
-        EventSystem currentES = EventSystem.current;
-        
-        if (currentES == null)
-        {
-            // Try to find an existing EventSystem in the scene
-            EventSystem existingES = FindObjectOfType<EventSystem>();
-            
-            if (existingES != null)
-            {
-                // Found one but it's not set as current - this can happen after scene transition
-                Debug.Log("TicketAccessGate: Found existing EventSystem, ensuring it's active");
-                existingES.gameObject.SetActive(false);
-                existingES.gameObject.SetActive(true);
-            }
-            else
-            {
-                // No EventSystem exists - create one
-                GameObject eventSystemGO = new GameObject("EventSystem_TicketGate");
-                EventSystem newES = eventSystemGO.AddComponent<EventSystem>();
-                eventSystemGO.AddComponent<StandaloneInputModule>();
-                Debug.Log("TicketAccessGate: Created new EventSystem for UI input");
-            }
-        }
-        else
-        {
-            // Ensure the current EventSystem is enabled
-            if (!currentES.gameObject.activeInHierarchy)
-            {
-                currentES.gameObject.SetActive(true);
-                Debug.Log("TicketAccessGate: Re-enabled inactive EventSystem");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Finds the FirstPersonController to disable movement when popup is open
-    /// </summary>
-    void FindPlayerController()
-    {
-        if (playerController == null)
-        {
-            playerController = FindObjectOfType<FirstPersonController>();
-            if (playerController != null)
-            {
-                Debug.Log("TicketAccessGate: Found FirstPersonController automatically");
-            }
-            else
-            {
-                Debug.LogWarning("TicketAccessGate: No FirstPersonController found - touch input may conflict!");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Notifies the player controller that UI is open/closed
-    /// Also disables/enables the joystick to prevent it from capturing touches
-    /// Returns true if successful, false if player controller not found
-    /// </summary>
-    bool SetPlayerUIState(bool isOpen)
-    {
-        // CRITICAL: Disable/enable joystick to prevent it from capturing touches
-        SetJoystickInteractable(!isOpen);
-        
-        if (playerController != null)
-        {
-            playerController.SetUIOpen(isOpen);
-            Debug.Log($"TicketAccessGate: Set player UI state to {isOpen}, joystick interactable: {!isOpen}");
-            return true;
-        }
-        else
-        {
-            Debug.LogError($"TicketAccessGate: playerController is NULL! Cannot set UI state to {isOpen}");
-            return false;
-        }
+        Debug.Log("TicketAccessGate: Initialized");
     }
     
-    /// <summary>
-    /// Finds the joystick in the scene and stores reference for later control
-    /// </summary>
-    void FindJoystick()
-    {
-        if (joystickToDisable == null)
-        {
-            joystickToDisable = FindObjectOfType<Joystick>();
-            if (joystickToDisable != null)
-            {
-                // Get or add a CanvasGroup to control interactability
-                joystickCanvasGroup = joystickToDisable.GetComponent<CanvasGroup>();
-                if (joystickCanvasGroup == null)
-                {
-                    joystickCanvasGroup = joystickToDisable.gameObject.AddComponent<CanvasGroup>();
-                }
-                Debug.Log("TicketAccessGate: Found joystick for control");
-            }
-        }
-    }
-    
-    /// <summary>
-    /// Enables or disables the joystick's ability to receive touches
-    /// This is CRITICAL - the joystick's IPointerDownHandler intercepts touches meant for the input field
-    /// </summary>
-    void SetJoystickInteractable(bool interactable)
-    {
-        // Always try to find joystick if we don't have a reference
-        if (joystickToDisable == null)
-        {
-            FindJoystick();
-        }
-        
-        if (joystickCanvasGroup != null)
-        {
-            // CanvasGroup.blocksRaycasts controls whether this UI element receives touch events
-            joystickCanvasGroup.blocksRaycasts = interactable;
-            joystickCanvasGroup.interactable = interactable;
-            Debug.Log($"TicketAccessGate: Joystick interactable set to {interactable}");
-        }
-        else if (joystickToDisable != null)
-        {
-            // Fallback: disable the entire joystick GameObject
-            joystickToDisable.gameObject.SetActive(interactable);
-            Debug.Log($"TicketAccessGate: Joystick GameObject active set to {interactable}");
-        }
-    }
-
-    /// <summary>
-    /// Finds the submit button in the popup if not manually assigned and connects the click handler
-    /// </summary>
-    void FindSubmitButton()
-    {
-        if (submitButton == null && popupPanel != null)
-        {
-            // Try to find a button in the popup panel
-            submitButton = popupPanel.GetComponentInChildren<Button>();
-        }
-        
-        // CRITICAL: Connect the button click to TryAccess method
-        if (submitButton != null)
-        {
-            // Ensure button is interactable
-            submitButton.interactable = true;
-            
-            // Ensure raycast is enabled on the button image
-            Image buttonImage = submitButton.GetComponent<Image>();
-            if (buttonImage != null)
-            {
-                buttonImage.raycastTarget = true;
-            }
-            
-            // Remove any existing listeners to avoid duplicates
-            submitButton.onClick.RemoveAllListeners();
-            
-            // Add the click handler
-            submitButton.onClick.AddListener(OnSubmitButtonClicked);
-            
-            Debug.Log("TicketAccessGate: Submit button connected to OnSubmitButtonClicked()");
-        }
-        else
-        {
-            Debug.LogError("TicketAccessGate: No submit button found! Button clicks will not work.");
-        }
-    }
-
-    /// <summary>
-    /// Called when the submit button is clicked. This wrapper ensures the click is processed.
-    /// </summary>
-    void OnSubmitButtonClicked()
-    {
-        Debug.Log("TicketAccessGate: Submit button clicked!");
-        TryAccess();
-    }
-
-    /// <summary>
-    /// Configures the popup panel to be centered with a fixed size instead of full-screen
-    /// </summary>
-    void ConfigurePopupPanel()
+    void FixPopupSize()
     {
         if (popupPanel == null) return;
         
-        RectTransform popupRect = popupPanel.GetComponent<RectTransform>();
-        if (popupRect != null)
-        {
-            // Set anchors to center
-            popupRect.anchorMin = new Vector2(0.5f, 0.5f);
-            popupRect.anchorMax = new Vector2(0.5f, 0.5f);
-            popupRect.pivot = new Vector2(0.5f, 0.5f);
-            
-            // Set fixed size (not full-screen)
-            float width = popupWidth > 0 ? popupWidth : 600f;
-            float height = popupHeight > 0 ? popupHeight : 400f;
-            popupRect.sizeDelta = new Vector2(width, height);
-            
-            // Center the popup
-            popupRect.anchoredPosition = Vector2.zero;
-        }
+        RectTransform rect = popupPanel.GetComponent<RectTransform>();
+        if (rect == null) return;
+        
+        // Always set to centered, reasonable size
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(500, 380);
+        
+        // Also fix input field and button sizes to fit within popup
+        FixInputFieldSize();
+        FixSubmitButtonSize();
+        
+        Debug.Log("TicketAccessGate: Fixed popup, input field, and button sizes");
     }
-
-    /// <summary>
-    /// Configures and styles all UI elements for mobile
-    /// </summary>
-    void ConfigureUIForMobile()
-    {
-        if (popupPanel == null) return;
-        
-        float panelWidth = popupWidth > 0 ? popupWidth : 600f;
-        
-        // Configure Input Field
-        ConfigureInputField(panelWidth);
-        
-        // Configure Submit Button
-        ConfigureSubmitButton(panelWidth);
-        
-        // Configure Feedback Text
-        ConfigureFeedbackText(panelWidth);
-    }
-
-    /// <summary>
-    /// Configures and styles the input field
-    /// </summary>
-    void ConfigureInputField(float panelWidth)
+    
+    void FixInputFieldSize()
     {
         if (codeInputField == null) return;
         
         RectTransform inputRect = codeInputField.GetComponent<RectTransform>();
-        if (inputRect != null)
+        if (inputRect == null) return;
+        
+        // Position input field in lower portion of popup, reasonable size
+        inputRect.anchorMin = new Vector2(0.5f, 0);
+        inputRect.anchorMax = new Vector2(0.5f, 0);
+        inputRect.pivot = new Vector2(0.5f, 0);
+        inputRect.anchoredPosition = new Vector2(0, 80);  // 80px from bottom
+        inputRect.sizeDelta = new Vector2(280, 45);  // Reasonable size for input
+        
+        // Style the input field
+        if (codeInputField.textComponent != null)
         {
-            // Set anchors to bottom of popup (below the card image)
-            inputRect.anchorMin = new Vector2(0.5f, 0f);
-            inputRect.anchorMax = new Vector2(0.5f, 0f);
-            inputRect.pivot = new Vector2(0.5f, 0f);
-            
-            // Size: 85% of panel width, good touch target height
-            float inputWidth = panelWidth * 0.85f;
-            float inputHeight = 50f;
-            inputRect.sizeDelta = new Vector2(inputWidth, inputHeight);
-            
-            // Position from bottom of popup
-            inputRect.anchoredPosition = new Vector2(0, 100f);
+            codeInputField.textComponent.fontSize = 18;
         }
         
-        // Style the input field background - ensure high visibility
-        Image inputImage = codeInputField.GetComponent<Image>();
-        if (inputImage != null)
-        {
-            inputImage.color = inputFieldColor;  // Pure white
-            inputImage.raycastTarget = true;
-            inputImage.type = Image.Type.Sliced;
-        }
-        
-        // Style the actual input text - make it dark and visible
-        TMP_Text textComponent = codeInputField.textComponent;
-        if (textComponent != null)
-        {
-            textComponent.fontSize = 22;
-            textComponent.color = inputTextColor;  // Dark color for visibility
-            textComponent.alignment = TextAlignmentOptions.Center;
-            textComponent.fontStyle = FontStyles.Normal;
-        }
-        
-        // Style the placeholder - make it clearly visible but distinct
+        // Fix placeholder
         if (codeInputField.placeholder != null)
         {
             TMP_Text placeholder = codeInputField.placeholder as TMP_Text;
             if (placeholder != null)
             {
-                placeholder.fontSize = 20;
-                placeholder.color = placeholderColor;  // Darker gray, fully opaque
-                placeholder.alignment = TextAlignmentOptions.Center;
-                placeholder.fontStyle = FontStyles.Italic;
-                placeholder.text = "Enter Code...";  // Ensure placeholder text
-            }
-        }
-        
-        // Configure input field settings
-        codeInputField.characterLimit = 20;
-        codeInputField.contentType = TMP_InputField.ContentType.Alphanumeric;
-        codeInputField.keyboardType = TouchScreenKeyboardType.Default;
-        
-        // iOS-specific settings - DISABLE TMP_InputField's keyboard handling
-        #if UNITY_IOS || UNITY_ANDROID
-        // We handle the keyboard directly, so prevent TMP_InputField from opening it
-        codeInputField.shouldHideMobileInput = true;  // Hide native overlay since we manage keyboard directly
-        codeInputField.readOnly = false;  // Allow text to be set programmatically
-        Debug.Log("TicketAccessGate: Configured input field for DIRECT keyboard mode");
-        #endif
-        
-        // Make the entire input field touchable
-        MakeInputFieldFullyTouchable();
-    }
-
-    /// <summary>
-    /// Makes the entire input field area responsive to touch
-    /// </summary>
-    void MakeInputFieldFullyTouchable()
-    {
-        if (codeInputField == null) return;
-        
-        // Ensure raycast target on main image
-        Image inputImage = codeInputField.GetComponent<Image>();
-        if (inputImage != null)
-        {
-            inputImage.raycastTarget = true;
-        }
-        
-        // Configure Text Area child - DO NOT add components at runtime (causes iOS crashes)
-        Transform textArea = codeInputField.transform.Find("Text Area");
-        if (textArea != null)
-        {
-            // Ensure RectTransform fills the entire input field
-            RectTransform textAreaRect = textArea.GetComponent<RectTransform>();
-            if (textAreaRect != null)
-            {
-                textAreaRect.anchorMin = Vector2.zero;
-                textAreaRect.anchorMax = Vector2.one;
-                textAreaRect.offsetMin = new Vector2(10, 5);
-                textAreaRect.offsetMax = new Vector2(-10, -5);
-            }
-            
-            // Only configure existing Image component, don't add new ones
-            Image textAreaImage = textArea.GetComponent<Image>();
-            if (textAreaImage != null)
-            {
-                textAreaImage.color = new Color(0, 0, 0, 0);
-                textAreaImage.raycastTarget = true;
+                placeholder.fontSize = 16;
             }
         }
     }
-
-    /// <summary>
-    /// Configures and styles the submit button
-    /// </summary>
-    void ConfigureSubmitButton(float panelWidth)
+    
+    void FixSubmitButtonSize()
     {
         if (submitButton == null) return;
         
         RectTransform buttonRect = submitButton.GetComponent<RectTransform>();
-        if (buttonRect != null)
-        {
-            // Set anchors to bottom of popup
-            buttonRect.anchorMin = new Vector2(0.5f, 0f);
-            buttonRect.anchorMax = new Vector2(0.5f, 0f);
-            buttonRect.pivot = new Vector2(0.5f, 0f);
-            
-            // Size: mobile-friendly button size
-            float buttonWidth = panelWidth * 0.6f;
-            float buttonHeight = 45f;
-            buttonRect.sizeDelta = new Vector2(buttonWidth, buttonHeight);
-            
-            // Position above the feedback text, below input field
-            buttonRect.anchoredPosition = new Vector2(0, 45f);
-        }
+        if (buttonRect == null) return;
         
-        // Style the button background
-        Image buttonImage = submitButton.GetComponent<Image>();
-        if (buttonImage != null)
-        {
-            buttonImage.color = buttonColor;
-            buttonImage.raycastTarget = true;
-            buttonImage.type = Image.Type.Sliced;
-        }
+        // Position button below input field
+        buttonRect.anchorMin = new Vector2(0.5f, 0);
+        buttonRect.anchorMax = new Vector2(0.5f, 0);
+        buttonRect.pivot = new Vector2(0.5f, 0);
+        buttonRect.anchoredPosition = new Vector2(0, 25);  // 25px from bottom
+        buttonRect.sizeDelta = new Vector2(120, 45);  // Reasonable button size
         
-        // Style the button text - keep existing text (may be Arabic)
+        // Style button text
         TMP_Text buttonText = submitButton.GetComponentInChildren<TMP_Text>();
         if (buttonText != null)
         {
-            // Don't change text - keep localized text if present
-            buttonText.fontSize = 20;
-            buttonText.fontStyle = FontStyles.Bold;
-            buttonText.color = buttonTextColor;
-            buttonText.alignment = TextAlignmentOptions.Center;
-            buttonText.enableWordWrapping = false;
-            buttonText.overflowMode = TextOverflowModes.Overflow;
+            buttonText.fontSize = 18;
         }
-        else
-        {
-            // Try legacy Text component
-            Text legacyText = submitButton.GetComponentInChildren<Text>();
-            if (legacyText != null)
-            {
-                legacyText.fontSize = 20;
-                legacyText.fontStyle = FontStyle.Bold;
-                legacyText.color = buttonTextColor;
-                legacyText.alignment = TextAnchor.MiddleCenter;
-            }
-        }
-        
-        // Configure button colors for interaction feedback
-        ColorBlock colors = submitButton.colors;
-        colors.normalColor = buttonColor;
-        colors.highlightedColor = new Color(
-            Mathf.Min(buttonColor.r * 1.2f, 1f), 
-            Mathf.Min(buttonColor.g * 1.2f, 1f), 
-            Mathf.Min(buttonColor.b * 1.2f, 1f), 1f);
-        colors.pressedColor = new Color(
-            buttonColor.r * 0.7f, 
-            buttonColor.g * 0.7f, 
-            buttonColor.b * 0.7f, 1f);
-        colors.selectedColor = buttonColor;
-        colors.fadeDuration = 0.1f;
-        submitButton.colors = colors;
     }
-
-    /// <summary>
-    /// Configures the feedback text position and style
-    /// </summary>
-    void ConfigureFeedbackText(float panelWidth)
+    
+    void EnsureEventSystem()
     {
-        if (feedbackText == null) return;
-        
-        RectTransform feedbackRect = feedbackText.GetComponent<RectTransform>();
-        if (feedbackRect != null)
+        // Check if EventSystem exists
+        EventSystem eventSystem = FindObjectOfType<EventSystem>();
+        if (eventSystem == null)
         {
-            // Set anchors to bottom of popup
-            feedbackRect.anchorMin = new Vector2(0.5f, 0f);
-            feedbackRect.anchorMax = new Vector2(0.5f, 0f);
-            feedbackRect.pivot = new Vector2(0.5f, 0f);
-            
-            // Size and position - at the very bottom
-            feedbackRect.sizeDelta = new Vector2(panelWidth * 0.9f, 35f);
-            feedbackRect.anchoredPosition = new Vector2(0, 5f);
+            Debug.Log("TicketAccessGate: Creating EventSystem");
+            GameObject esObj = new GameObject("EventSystem");
+            esObj.AddComponent<EventSystem>();
+            esObj.AddComponent<StandaloneInputModule>();
         }
-        
-        // Style the text for visibility
-        feedbackText.fontSize = 16;
-        feedbackText.fontStyle = FontStyles.Bold;
-        feedbackText.alignment = TextAlignmentOptions.Center;
-        feedbackText.color = feedbackErrorColor;  // Default to error color
-        feedbackText.enableWordWrapping = true;
-        feedbackText.overflowMode = TextOverflowModes.Ellipsis;
-        
-        // Add outline/shadow for better visibility if possible
-        // This is done by ensuring the text stands out
-    }
-
-    /// <summary>
-    /// Shows feedback message with appropriate styling
-    /// </summary>
-    void ShowFeedback(string message, bool isSuccess)
-    {
-        if (feedbackText == null) return;
-        
-        feedbackText.text = message;
-        feedbackText.color = isSuccess ? feedbackSuccessColor : feedbackErrorColor;
-        
-        // Make sure the text object is active
-        feedbackText.gameObject.SetActive(true);
+        else if (!eventSystem.gameObject.activeInHierarchy)
+        {
+            Debug.Log("TicketAccessGate: Activating EventSystem");
+            eventSystem.gameObject.SetActive(true);
+        }
     }
 
     void Update()
     {
-        // Safety check
-        if (popupPanel == null) return;
+        if (popupPanel == null || !popupPanel.activeSelf) return;
         
-        // DIRECT KEYBOARD MODE: Sync text from TouchScreenKeyboard to input field display
-        #if UNITY_IOS || UNITY_ANDROID
-        if (useDirectKeyboard && mobileKeyboard != null)
-        {
-            // Check keyboard state
-            bool keyboardActive = mobileKeyboard.active;
-            var status = mobileKeyboard.status;
-            
-            // Always sync text while keyboard exists
-            if (codeInputField != null && mobileKeyboard.text != null)
-            {
-                if (codeInputField.text != mobileKeyboard.text)
-                {
-                    codeInputField.text = mobileKeyboard.text;
-                }
-            }
-            
-            // Handle keyboard close events
-            if (!keyboardActive || status == TouchScreenKeyboard.Status.Done)
-            {
-                // Keyboard closed with "Done" button or Return key
-                Debug.Log($"TicketAccessGate: Keyboard closed with Done. Text='{mobileKeyboard.text}'");
-                if (codeInputField != null)
-                {
-                    codeInputField.text = mobileKeyboard.text;
-                }
-                mobileKeyboard = null;
-                
-                // Auto-submit when Done is pressed
-                if (status == TouchScreenKeyboard.Status.Done)
-                {
-                    TryAccess();
-                }
-            }
-            else if (status == TouchScreenKeyboard.Status.Canceled)
-            {
-                // Keyboard cancelled - keep text but don't submit
-                Debug.Log($"TicketAccessGate: Keyboard cancelled. Text='{mobileKeyboard.text}'");
-                if (codeInputField != null)
-                {
-                    codeInputField.text = mobileKeyboard.text;
-                }
-                mobileKeyboard = null;
-            }
-            else if (status == TouchScreenKeyboard.Status.LostFocus)
-            {
-                // Keyboard lost focus (dismissed by user) - keep text
-                Debug.Log($"TicketAccessGate: Keyboard lost focus. Text='{mobileKeyboard.text}'");
-                if (codeInputField != null)
-                {
-                    codeInputField.text = mobileKeyboard.text;
-                }
-                mobileKeyboard = null;
-            }
-        }
-        #endif
-        
-        // If player nearby and pressed Enter
         if (playerNearby && Input.GetKeyDown(KeyCode.Return))
         {
-            TryAccess();
+            if (keypadVisible)
+                FillInputAndClose();
+            else
+                TryAccess();
         }
         
-        // Handle touch input for iOS - activate input field and button when touched
-        if (playerNearby && popupPanel.activeSelf)
+        // Desktop keyboard input
+        if (playerNearby && keypadVisible)
         {
-            try
+            foreach (char c in Input.inputString)
             {
-                HandleTouchInput();
-                HandleButtonTouchFallback();
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError($"TicketAccessGate: Touch handling error: {e.Message}");
+                if (char.IsDigit(c))
+                    AddDigit(c);
+                else if (c == '\b')
+                    RemoveLastDigit();
             }
         }
     }
 
-    /// <summary>
-    /// Fallback touch handler for the submit button on iOS.
-    /// Sometimes Unity Button.onClick doesn't fire reliably on iOS, so we detect touches manually.
-    /// </summary>
-    void HandleButtonTouchFallback()
+    void SetupOriginalSubmitButton()
     {
         if (submitButton == null) return;
         
-        // Check for touch input (iOS)
-        if (Input.touchCount > 0)
-        {
-            Touch touch = Input.GetTouch(0);
-            // Only trigger on touch up (finger lifted) to prevent double-firing
-            if (touch.phase == TouchPhase.Ended)
-            {
-                if (IsTouchOverButton(touch.position))
-                {
-                    Debug.Log("TicketAccessGate: Button touched via fallback handler");
-                    TryAccess();
-                }
-            }
-        }
+        // Just wire up the click - DON'T change size or position
+        submitButton.onClick.RemoveAllListeners();
+        submitButton.onClick.AddListener(TryAccess);
     }
 
-    /// <summary>
-    /// Checks if a screen position is over the submit button
-    /// </summary>
-    bool IsTouchOverButton(Vector2 screenPosition)
-    {
-        if (submitButton == null) return false;
-        
-        RectTransform buttonRect = submitButton.GetComponent<RectTransform>();
-        if (buttonRect == null) return false;
-        
-        // Get the canvas for proper coordinate conversion
-        Canvas canvas = submitButton.GetComponentInParent<Canvas>();
-        if (canvas == null) return false;
-        
-        Camera cam = null;
-        if (canvas.renderMode == RenderMode.ScreenSpaceCamera || canvas.renderMode == RenderMode.WorldSpace)
-        {
-            cam = canvas.worldCamera;
-        }
-        
-        return RectTransformUtility.RectangleContainsScreenPoint(buttonRect, screenPosition, cam);
-    }
-
-    /// <summary>
-    /// Handles touch input to ensure the input field activates properly on iOS
-    /// </summary>
-    void HandleTouchInput()
+    void CreateOpenKeypadButton()
     {
         if (codeInputField == null) return;
         
-        // Check for touch input
-        if (Input.touchCount > 0)
+        // Check if button already exists
+        if (openKeypadButton != null) return;
+        
+        // Also check by name
+        Transform existing = codeInputField.transform.Find("OpenKeypadBtn");
+        if (existing != null)
         {
-            Touch touch = Input.GetTouch(0);
-            if (touch.phase == TouchPhase.Began)
+            openKeypadButton = existing.GetComponent<Button>();
+            if (openKeypadButton != null)
             {
-                // Check if touch is within the input field area
-                if (IsTouchOverInputField(touch.position))
-                {
-                    Debug.Log($"TicketAccessGate: Touch on input field. useDirectKeyboard={useDirectKeyboard}");
-                    OpenKeyboardDirect();
-                }
+                openKeypadButton.onClick.RemoveAllListeners();
+                openKeypadButton.onClick.AddListener(ToggleKeypad);
+                return;
             }
         }
-        // Also handle mouse clicks for editor testing
-        else if (Input.GetMouseButtonDown(0))
-        {
-            if (IsTouchOverInputField(Input.mousePosition))
-            {
-                Debug.Log("TicketAccessGate: Mouse click on input field");
-                OpenKeyboardDirect();
-            }
-        }
+        
+        // Small button as child of input field
+        GameObject buttonObj = new GameObject("OpenKeypadBtn");
+        buttonObj.transform.SetParent(codeInputField.transform, false);
+        
+        RectTransform buttonRect = buttonObj.AddComponent<RectTransform>();
+        buttonRect.anchorMin = new Vector2(1, 0);
+        buttonRect.anchorMax = new Vector2(1, 1);
+        buttonRect.pivot = new Vector2(1, 0.5f);
+        buttonRect.anchoredPosition = new Vector2(0, 0);
+        buttonRect.sizeDelta = new Vector2(45, 0);
+        
+        Image buttonImage = buttonObj.AddComponent<Image>();
+        buttonImage.color = new Color(0.3f, 0.5f, 0.65f, 1f);
+        
+        openKeypadButton = buttonObj.AddComponent<Button>();
+        openKeypadButton.onClick.AddListener(ToggleKeypad);
+        
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(buttonObj.transform, false);
+        RectTransform textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        
+        TMP_Text btnText = textObj.AddComponent<TextMeshProUGUI>();
+        btnText.text = "123";
+        btnText.fontSize = 14;
+        btnText.fontStyle = FontStyles.Bold;
+        btnText.color = Color.white;
+        btnText.alignment = TextAlignmentOptions.Center;
     }
 
-    /// <summary>
-    /// Opens the keyboard directly - BYPASSES TMP_InputField on mobile for reliability
-    /// </summary>
-    void OpenKeyboardDirect()
+    void CreateKeypadWithDisplay()
     {
-        if (codeInputField == null) return;
+        if (popupPanel == null) return;
         
-        Debug.Log("TicketAccessGate: OpenKeyboardDirect called");
+        // Check if keypad already exists
+        if (keypadPanel != null) return;
         
-        #if UNITY_IOS || UNITY_ANDROID
-        if (useDirectKeyboard)
+        Canvas parentCanvas = popupPanel.GetComponentInParent<Canvas>();
+        if (parentCanvas == null) return;
+        
+        // Also check by name
+        Transform existing = parentCanvas.transform.Find("NumericKeypad");
+        if (existing != null)
         {
-            // DIRECT APPROACH: Don't use TMP_InputField's keyboard at all
-            // Just open TouchScreenKeyboard directly every time
-            
-            // Close any existing keyboard first
-            if (mobileKeyboard != null)
-            {
-                mobileKeyboard = null;
-            }
-            
-            // Open keyboard with current text
-            string currentText = codeInputField.text ?? "";
-            Debug.Log($"TicketAccessGate: Opening TouchScreenKeyboard directly with text: '{currentText}'");
-            
-            mobileKeyboard = TouchScreenKeyboard.Open(
-                currentText,
-                TouchScreenKeyboardType.Default,
-                false,  // autocorrection off
-                false,  // multiline off  
-                false,  // secure off
-                false,  // alert off
-                "Enter access code",
-                20      // max length
-            );
-            
-            Debug.Log($"TicketAccessGate: TouchScreenKeyboard opened. Active={mobileKeyboard?.active}, Status={mobileKeyboard?.status}");
+            keypadPanel = existing.gameObject;
+            keypadDisplayText = keypadPanel.GetComponentInChildren<TMP_Text>();
             return;
         }
-        #endif
         
-        // Fallback for desktop/editor - use normal activation
-        ActivateInputFieldSafe();
+        // Calculate sizes
+        float gridWidth = 3 * buttonSize + 2 * buttonSpacing;
+        float gridHeight = 4 * buttonSize + 3 * buttonSpacing;
+        float displayHeight = 50f;
+        float fillButtonHeight = 45f;
+        float padding = 15f;
+        float totalHeight = displayHeight + gridHeight + fillButtonHeight + padding * 4;
+        float totalWidth = gridWidth + padding * 2;
+        
+        // Create panel with background
+        keypadPanel = new GameObject("NumericKeypad");
+        keypadPanel.transform.SetParent(parentCanvas.transform, false);
+        
+        RectTransform panelRect = keypadPanel.AddComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(1, 0.5f);
+        panelRect.anchorMax = new Vector2(1, 0.5f);
+        panelRect.pivot = new Vector2(1, 0.5f);
+        panelRect.sizeDelta = new Vector2(totalWidth, totalHeight);
+        panelRect.anchoredPosition = new Vector2(-20, 0);
+        
+        Image panelBg = keypadPanel.AddComponent<Image>();
+        panelBg.color = keypadBgColor;
+        
+        // Create display area at top
+        CreateKeypadDisplay(padding, totalHeight - padding);
+        
+        // Create number buttons
+        float buttonsStartY = totalHeight - padding - displayHeight - padding;
+        CreateNumberGrid(padding, buttonsStartY);
+        
+        // Create FILL button at bottom
+        float fillY = padding;
+        CreateFillButton(padding, fillY, gridWidth, fillButtonHeight);
+        
+        keypadPanel.SetActive(false);
     }
 
-    /// <summary>
-    /// Safely activates the input field (desktop/editor only, mobile uses OpenKeyboardDirect)
-    /// </summary>
-    void ActivateInputFieldSafe()
+    void CreateKeypadDisplay(float xOffset, float topY)
     {
-        if (codeInputField == null) return;
+        GameObject displayBg = new GameObject("DisplayBg");
+        displayBg.transform.SetParent(keypadPanel.transform, false);
         
-        Debug.Log("TicketAccessGate: ActivateInputFieldSafe called (desktop mode)");
+        RectTransform bgRect = displayBg.AddComponent<RectTransform>();
+        bgRect.anchorMin = new Vector2(0, 1);
+        bgRect.anchorMax = new Vector2(1, 1);
+        bgRect.pivot = new Vector2(0.5f, 1);
+        bgRect.anchoredPosition = new Vector2(0, -15);
+        bgRect.sizeDelta = new Vector2(-30, 50);
         
-        // CRITICAL: Ensure EventSystem exists and is working
-        EnsureEventSystemExists();
+        Image bgImage = displayBg.AddComponent<Image>();
+        bgImage.color = displayBgColor;
         
-        // Stop any pending activation coroutines
-        StopAllCoroutines();
+        GameObject displayObj = new GameObject("DisplayText");
+        displayObj.transform.SetParent(displayBg.transform, false);
         
-        // Start robust activation sequence
-        StartCoroutine(ActivateInputFieldCoroutine());
+        RectTransform displayRect = displayObj.AddComponent<RectTransform>();
+        displayRect.anchorMin = Vector2.zero;
+        displayRect.anchorMax = Vector2.one;
+        displayRect.offsetMin = new Vector2(10, 5);
+        displayRect.offsetMax = new Vector2(-10, -5);
+        
+        keypadDisplayText = displayObj.AddComponent<TextMeshProUGUI>();
+        keypadDisplayText.text = "";
+        keypadDisplayText.fontSize = 28;
+        keypadDisplayText.fontStyle = FontStyles.Bold;
+        keypadDisplayText.color = displayTextColor;
+        keypadDisplayText.alignment = TextAlignmentOptions.Center;
+        
+        UpdateKeypadDisplay();
     }
 
-    /// <summary>
-    /// Robust coroutine to activate input field on iOS - handles scene transition issues
-    /// Uses multiple methods to ensure keyboard opens
-    /// </summary>
-    System.Collections.IEnumerator ActivateInputFieldCoroutine()
+    void CreateNumberGrid(float xOffset, float topY)
     {
-        Debug.Log("TicketAccessGate: Starting input field activation coroutine");
+        float startX = buttonSize / 2 + 15;
+        float startY = -80;
         
-        // Wait one frame for any pending UI updates
-        yield return null;
+        // Row 1: 1, 2, 3
+        CreateNumButton("1", startX, startY);
+        CreateNumButton("2", startX + buttonSize + buttonSpacing, startY);
+        CreateNumButton("3", startX + 2 * (buttonSize + buttonSpacing), startY);
         
-        if (codeInputField == null || popupPanel == null || !popupPanel.activeSelf)
-        {
-            Debug.Log("TicketAccessGate: Activation cancelled - popup not active");
-            yield break;
-        }
+        // Row 2: 4, 5, 6
+        float y2 = startY - buttonSize - buttonSpacing;
+        CreateNumButton("4", startX, y2);
+        CreateNumButton("5", startX + buttonSize + buttonSpacing, y2);
+        CreateNumButton("6", startX + 2 * (buttonSize + buttonSpacing), y2);
         
-        // STEP 1: Ensure EventSystem is ready
-        EnsureEventSystemExists();
+        // Row 3: 7, 8, 9
+        float y3 = y2 - buttonSize - buttonSpacing;
+        CreateNumButton("7", startX, y3);
+        CreateNumButton("8", startX + buttonSize + buttonSpacing, y3);
+        CreateNumButton("9", startX + 2 * (buttonSize + buttonSpacing), y3);
         
-        if (EventSystem.current == null)
-        {
-            Debug.LogError("TicketAccessGate: No EventSystem available for keyboard!");
-            // Try to create one
-            GameObject esGO = new GameObject("EventSystem_Emergency");
-            esGO.AddComponent<EventSystem>();
-            esGO.AddComponent<StandaloneInputModule>();
-            yield return null;
-        }
-        
-        // STEP 2: Force complete reset of input field state
-        Debug.Log("TicketAccessGate: Forcing complete input field reset");
-        
-        // Deactivate first
-        codeInputField.DeactivateInputField();
-        codeInputField.ReleaseSelection();
-        
-        // Clear EventSystem selection
-        if (EventSystem.current != null)
-        {
-            EventSystem.current.SetSelectedGameObject(null);
-        }
-        yield return null;
-        
-        // STEP 3: Reset component state by toggling enabled
-        codeInputField.interactable = false;
-        codeInputField.enabled = false;
-        yield return null;
-        codeInputField.enabled = true;
-        codeInputField.interactable = true;
-        yield return null;
-        yield return null;  // Extra frame for iOS
-        
-        // STEP 4: Select and activate the input field using multiple methods
-        if (EventSystem.current != null)
-        {
-            EventSystem.current.SetSelectedGameObject(codeInputField.gameObject);
-        }
-        codeInputField.Select();
-        codeInputField.ActivateInputField();
-        
-        Debug.Log($"TicketAccessGate: Input field activated. isFocused={codeInputField.isFocused}");
-        
-        // STEP 5: For iOS - use TouchScreenKeyboard directly if needed
-        #if UNITY_IOS || UNITY_ANDROID
-        yield return new WaitForSeconds(0.15f);
-        
-        if (codeInputField != null && popupPanel != null && popupPanel.activeSelf)
-        {
-            if (!codeInputField.isFocused || !TouchScreenKeyboard.visible)
-            {
-                Debug.Log("TicketAccessGate: Keyboard not visible, opening manually");
-                
-                // Force focus again
-                codeInputField.Select();
-                codeInputField.ActivateInputField();
-                
-                // If still no keyboard, try opening it directly
-                yield return new WaitForSeconds(0.1f);
-                if (!TouchScreenKeyboard.visible && codeInputField != null)
-                {
-                    Debug.Log("TicketAccessGate: Opening TouchScreenKeyboard directly");
-                    mobileKeyboard = TouchScreenKeyboard.Open(
-                        codeInputField.text, 
-                        TouchScreenKeyboardType.Default, 
-                        false,  // autocorrection
-                        false,  // multiline
-                        false,  // secure
-                        false,  // alert
-                        "Enter access code",  // placeholder
-                        50      // max length
-                    );
-                }
-            }
-        }
-        #else
-        // For editor/desktop, just retry activation
-        yield return new WaitForSeconds(0.1f);
-        if (codeInputField != null && popupPanel != null && popupPanel.activeSelf && !codeInputField.isFocused)
-        {
-            Debug.Log("TicketAccessGate: Re-activating input field (was not focused)");
-            codeInputField.Select();
-            codeInputField.ActivateInputField();
-        }
-        #endif
-        
-        inputFieldWasSelected = true;
-        Debug.Log($"TicketAccessGate: Activation complete. isFocused={codeInputField?.isFocused}, keyboard visible={TouchScreenKeyboard.visible}");
+        // Row 4: C, 0, ⌫
+        float y4 = y3 - buttonSize - buttonSpacing;
+        CreateActionBtn("C", startX, y4, clearButtonColor, ClearKeypad);
+        CreateNumButton("0", startX + buttonSize + buttonSpacing, y4);
+        CreateActionBtn("⌫", startX + 2 * (buttonSize + buttonSpacing), y4, deleteButtonColor, RemoveLastDigit);
     }
 
-    /// <summary>
-    /// Checks if a screen position is over the input field
-    /// </summary>
-    bool IsTouchOverInputField(Vector2 screenPosition)
+    void CreateNumButton(string digit, float x, float y)
     {
-        if (codeInputField == null) return false;
+        GameObject btnObj = new GameObject($"Num_{digit}");
+        btnObj.transform.SetParent(keypadPanel.transform, false);
         
-        RectTransform inputRect = codeInputField.GetComponent<RectTransform>();
-        if (inputRect == null) return false;
+        RectTransform btnRect = btnObj.AddComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(0, 1);
+        btnRect.anchorMax = new Vector2(0, 1);
+        btnRect.pivot = new Vector2(0.5f, 0.5f);
+        btnRect.anchoredPosition = new Vector2(x, y);
+        btnRect.sizeDelta = new Vector2(buttonSize, buttonSize);
         
-        // Get the canvas for proper coordinate conversion
-        Canvas canvas = codeInputField.GetComponentInParent<Canvas>();
-        if (canvas == null) return false;
+        Image btnImage = btnObj.AddComponent<Image>();
+        btnImage.color = numberButtonColor;
         
-        Camera cam = null;
-        if (canvas.renderMode == RenderMode.ScreenSpaceCamera || canvas.renderMode == RenderMode.WorldSpace)
-        {
-            cam = canvas.worldCamera;
-        }
+        Button btn = btnObj.AddComponent<Button>();
+        ColorBlock colors = btn.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.3f, 1.3f, 1.3f, 1f);
+        colors.pressedColor = new Color(1.5f, 1.5f, 1.5f, 1f);
+        btn.colors = colors;
         
-        return RectTransformUtility.RectangleContainsScreenPoint(inputRect, screenPosition, cam);
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(btnObj.transform, false);
+        RectTransform textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        
+        TMP_Text btnText = textObj.AddComponent<TextMeshProUGUI>();
+        btnText.text = digit;
+        btnText.fontSize = 28;
+        btnText.fontStyle = FontStyles.Bold;
+        btnText.color = Color.white;
+        btnText.alignment = TextAlignmentOptions.Center;
+        
+        char digitChar = digit[0];
+        btn.onClick.AddListener(() => AddDigit(digitChar));
     }
 
-    public void TryAccess()
+    void CreateActionBtn(string label, float x, float y, Color color, System.Action action)
     {
-        // Prevent double-triggering with a short cooldown
-        if (Time.time - lastAccessAttemptTime < 0.3f)
+        GameObject btnObj = new GameObject($"Action_{label}");
+        btnObj.transform.SetParent(keypadPanel.transform, false);
+        
+        RectTransform btnRect = btnObj.AddComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(0, 1);
+        btnRect.anchorMax = new Vector2(0, 1);
+        btnRect.pivot = new Vector2(0.5f, 0.5f);
+        btnRect.anchoredPosition = new Vector2(x, y);
+        btnRect.sizeDelta = new Vector2(buttonSize, buttonSize);
+        
+        Image btnImage = btnObj.AddComponent<Image>();
+        btnImage.color = color;
+        
+        Button btn = btnObj.AddComponent<Button>();
+        ColorBlock colors = btn.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.3f, 1.3f, 1.3f, 1f);
+        colors.pressedColor = new Color(1.5f, 1.5f, 1.5f, 1f);
+        btn.colors = colors;
+        
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(btnObj.transform, false);
+        RectTransform textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        
+        TMP_Text btnText = textObj.AddComponent<TextMeshProUGUI>();
+        btnText.text = label;
+        btnText.fontSize = label == "⌫" ? 26 : 22;
+        btnText.fontStyle = FontStyles.Bold;
+        btnText.color = Color.white;
+        btnText.alignment = TextAlignmentOptions.Center;
+        
+        btn.onClick.AddListener(() => action());
+    }
+
+    void CreateFillButton(float x, float y, float width, float height)
+    {
+        GameObject btnObj = new GameObject("FillButton");
+        btnObj.transform.SetParent(keypadPanel.transform, false);
+        
+        RectTransform btnRect = btnObj.AddComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(0, 0);
+        btnRect.anchorMax = new Vector2(1, 0);
+        btnRect.pivot = new Vector2(0.5f, 0);
+        btnRect.anchoredPosition = new Vector2(0, 15);
+        btnRect.sizeDelta = new Vector2(-30, height);
+        
+        Image btnImage = btnObj.AddComponent<Image>();
+        btnImage.color = fillButtonColor;
+        
+        Button btn = btnObj.AddComponent<Button>();
+        ColorBlock colors = btn.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.2f, 1.2f, 1.2f, 1f);
+        colors.pressedColor = new Color(1.4f, 1.4f, 1.4f, 1f);
+        btn.colors = colors;
+        btn.onClick.AddListener(FillInputAndClose);
+        
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(btnObj.transform, false);
+        RectTransform textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        
+        TMP_Text btnText = textObj.AddComponent<TextMeshProUGUI>();
+        btnText.text = "FILL ✓";
+        btnText.fontSize = 20;
+        btnText.fontStyle = FontStyles.Bold;
+        btnText.color = Color.white;
+        btnText.alignment = TextAlignmentOptions.Center;
+    }
+
+    void ToggleKeypad()
+    {
+        if (keypadVisible)
+            HideKeypad();
+        else
+            ShowKeypad();
+    }
+
+    void ShowKeypad()
+    {
+        if (keypadPanel != null)
         {
-            Debug.Log("TicketAccessGate: Ignoring duplicate access attempt");
-            return;
+            keypadPanel.SetActive(true);
+            keypadVisible = true;
+            keypadText = codeInputField != null ? codeInputField.text : "";
+            UpdateKeypadDisplay();
         }
-        lastAccessAttemptTime = Time.time;
-        
-        if (isProcessingAccess) return;
-        if (codeInputField == null) return;
-        
-        string enteredCode = codeInputField.text.Trim();
-        
-        Debug.Log($"TicketAccessGate: TryAccess called with code: '{enteredCode}'");
+    }
 
-        // Check if code is empty
-        if (string.IsNullOrEmpty(enteredCode))
+    void HideKeypad()
+    {
+        if (keypadPanel != null)
         {
-            ShowFeedback("Please enter a code", false);
-            return;
+            keypadPanel.SetActive(false);
+            keypadVisible = false;
         }
+    }
 
-        if (enteredCode.Equals(correctCode, System.StringComparison.OrdinalIgnoreCase))
+    void FillInputAndClose()
+    {
+        if (codeInputField != null)
+            codeInputField.text = keypadText;
+        
+        HideKeypad();
+        
+        if (feedbackText != null)
+            feedbackText.text = "";
+    }
+
+    void AddDigit(char digit)
+    {
+        if (keypadText.Length >= MAX_CODE_LENGTH) return;
+        keypadText += digit;
+        UpdateKeypadDisplay();
+    }
+
+    void RemoveLastDigit()
+    {
+        if (keypadText.Length > 0)
         {
-            isProcessingAccess = true;
-            ShowFeedback("✓ Verified! Loading...", true);
-            
-            if (gateBlocker != null)
-                gateBlocker.SetActive(false);
+            keypadText = keypadText.Substring(0, keypadText.Length - 1);
+            UpdateKeypadDisplay();
+        }
+    }
 
-            Debug.Log($"TicketAccessGate: Code correct! Loading scene {targetSceneIndex}");
-            
-            // Load scene asynchronously (prevents freeze on mobile)
-            SceneManager.LoadSceneAsync(targetSceneIndex);
+    void ClearKeypad()
+    {
+        keypadText = "";
+        UpdateKeypadDisplay();
+    }
+
+    void UpdateKeypadDisplay()
+    {
+        if (keypadDisplayText == null) return;
+        
+        if (string.IsNullOrEmpty(keypadText))
+        {
+            keypadDisplayText.text = "_ _ _ _ _ _";
+            keypadDisplayText.color = new Color(displayTextColor.r, displayTextColor.g, displayTextColor.b, 0.5f);
         }
         else
         {
-            ShowFeedback("✗ Invalid code. Try again.", false);
-            Debug.Log($"TicketAccessGate: Code incorrect. Expected: {correctCode}");
+            keypadDisplayText.text = string.Join(" ", keypadText.ToCharArray());
+            keypadDisplayText.color = displayTextColor;
+        }
+    }
+
+    void ShowFeedback(string message, bool isError)
+    {
+        if (feedbackText == null) return;
+        feedbackText.text = message;
+        feedbackText.color = isError ? new Color(0.95f, 0.3f, 0.3f, 1f) : new Color(0.3f, 0.85f, 0.45f, 1f);
+        feedbackText.gameObject.SetActive(true);
+    }
+
+    void TryAccess()
+    {
+        if (isProcessingAccess) return;
+        
+        string code = "";
+        if (codeInputField != null)
+            code = codeInputField.text.Trim().ToUpper();
+        
+        if (string.IsNullOrEmpty(code))
+        {
+            ShowFeedback("Please enter a code", true);
+            return;
+        }
+        
+        Debug.Log($"TicketAccessGate: Checking code '{code}' against '{correctCode}'");
+        
+        if (code == correctCode.ToUpper())
+        {
+            ShowFeedback("ACCESS GRANTED!", false);
+            isProcessingAccess = true;
             
-            // Clear the input field for retry
-            codeInputField.text = "";
-            codeInputField.Select();
-            codeInputField.ActivateInputField();
+            // Hide keypad
+            HideKeypad();
+            
+            // Use Invoke instead of Coroutine to avoid "object inactive" error
+            Invoke("LoadTargetScene", 1.0f);
+        }
+        else
+        {
+            ShowFeedback("Invalid code - try again", true);
+            if (codeInputField != null)
+                codeInputField.text = "";
+            keypadText = "";
+            UpdateKeypadDisplay();
+        }
+    }
+
+    void LoadTargetScene()
+    {
+        Debug.Log($"TicketAccessGate: LoadTargetScene called, index={targetSceneIndex}");
+        
+        // Disable gate blocker AFTER showing message
+        if (gateBlocker != null)
+            gateBlocker.SetActive(false);
+        
+        SetPlayerUIState(false);
+        
+        if (targetSceneIndex >= 0 && targetSceneIndex < SceneManager.sceneCountInBuildSettings)
+        {
+            Debug.Log($"TicketAccessGate: Loading scene {targetSceneIndex}");
+            SceneManager.LoadScene(targetSceneIndex);
+        }
+        else
+        {
+            Debug.LogError($"TicketAccessGate: Invalid scene index {targetSceneIndex}");
+            isProcessingAccess = false;
         }
     }
 
@@ -980,111 +676,43 @@ public class TicketAccessGate : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
+            Debug.Log("TicketAccessGate: Player entered trigger");
+            
             playerNearby = true;
-            
-            // Safety check for popup panel
-            if (popupPanel == null)
-            {
-                Debug.LogError("TicketAccessGate: popupPanel is null!");
-                return;
-            }
-            
-            // CRITICAL: Re-find player controller EVERY time popup opens
-            // This handles scene transitions where the old reference becomes invalid
             FindPlayerControllerNow();
             
-            // Ensure EventSystem exists BEFORE showing popup
-            EnsureEventSystemExists();
+            // Ensure EventSystem is working
+            EnsureEventSystem();
             
-            popupPanel.SetActive(true);
+            // Fix popup size before showing
+            FixPopupSize();
             
-            // CRITICAL: Tell player controller that UI is open to stop touch processing
-            if (!SetPlayerUIState(true))
+            if (popupPanel != null)
             {
-                Debug.LogWarning("TicketAccessGate: Could not disable player input - player may move while typing!");
+                popupPanel.SetActive(true);
+                if (codeInputField != null)
+                    codeInputField.text = "";
+                keypadText = "";
+                if (feedbackText != null)
+                    feedbackText.text = "";
             }
             
-            // Reset all state flags
-            isProcessingAccess = false;
-            lastAccessAttemptTime = 0f;
-            inputFieldWasSelected = false;
-            
-            // Stop all existing coroutines to prevent conflicts
-            StopAllCoroutines();
-            
-            // Reset the UI state
-            if (feedbackText != null)
+            // Ensure keypad button exists
+            if (openKeypadButton == null)
             {
-                feedbackText.text = "";
-                feedbackText.gameObject.SetActive(true);
+                Debug.Log("TicketAccessGate: Recreating keypad button");
+                CreateOpenKeypadButton();
             }
             
-            if (codeInputField != null)
+            // Ensure keypad exists
+            if (keypadPanel == null)
             {
-                codeInputField.text = "";
-                codeInputField.interactable = true;
-                
-                // Ensure the input field is ready to receive input
-                if (EventSystem.current != null)
-                {
-                    // Clear any existing selection first
-                    EventSystem.current.SetSelectedGameObject(null);
-                }
-                
-                // DO NOT auto-focus - let user tap to open keyboard
-                // This prevents unwanted keyboard popup and iOS issues
-                // The user will tap the input field to open keyboard
+                Debug.Log("TicketAccessGate: Recreating keypad");
+                CreateKeypadWithDisplay();
             }
             
-            Debug.Log("TicketAccessGate: Player entered, popup activated - tap input field to type");
-        }
-    }
-
-    /// <summary>
-    /// Finds the player controller immediately - called every time popup opens
-    /// to handle scene transitions where the old reference becomes invalid
-    /// </summary>
-    void FindPlayerControllerNow()
-    {
-        // Always search for the player controller, even if we have a reference
-        // because the old reference might be from a destroyed object
-        FirstPersonController foundController = FindObjectOfType<FirstPersonController>();
-        
-        if (foundController != null)
-        {
-            playerController = foundController;
-            Debug.Log("TicketAccessGate: Found FirstPersonController for this scene");
-        }
-        else
-        {
-            playerController = null;
-            Debug.LogError("TicketAccessGate: NO FirstPersonController found in scene! Player will move while popup is open!");
-        }
-    }
-
-    /// <summary>
-    /// Delays input field focus slightly to ensure it works on iOS
-    /// </summary>
-    System.Collections.IEnumerator DelayedInputFieldFocus()
-    {
-        // Wait multiple frames for iOS to fully set up the UI
-        yield return null;
-        yield return null;
-        yield return new WaitForSeconds(0.1f);
-        
-        if (codeInputField != null && popupPanel != null && popupPanel.activeSelf)
-        {
-            // Ensure EventSystem knows about our input field
-            if (EventSystem.current != null)
-            {
-                EventSystem.current.SetSelectedGameObject(codeInputField.gameObject);
-            }
-            
-            codeInputField.Select();
-            codeInputField.ActivateInputField();
-            inputFieldWasSelected = true;
-            
-            Debug.Log("TicketAccessGate: Input field focused after delay (iOS-safe)");
+            HideKeypad();
+            SetPlayerUIState(true);
         }
     }
 
@@ -1094,60 +722,54 @@ public class TicketAccessGate : MonoBehaviour
         {
             playerNearby = false;
             
-            // Stop any pending coroutines
-            StopAllCoroutines();
-            
-            // Deactivate input field to hide keyboard
-            if (codeInputField != null)
-            {
-                codeInputField.DeactivateInputField();
-                codeInputField.text = "";  // Clear text for next time
-            }
-            
-            // Clean up mobile keyboard reference
-            #if UNITY_IOS || UNITY_ANDROID
-            if (mobileKeyboard != null)
-            {
-                mobileKeyboard = null;
-            }
-            #endif
-            
-            // Clear EventSystem selection
-            if (EventSystem.current != null)
-            {
-                EventSystem.current.SetSelectedGameObject(null);
-            }
-            
             if (popupPanel != null)
                 popupPanel.SetActive(false);
             
-            // Re-enable player movement
+            HideKeypad();
+            keypadText = "";
+            isProcessingAccess = false;
+            
             SetPlayerUIState(false);
-            
-            // Reset state
-            inputFieldWasSelected = false;
-            
-            Debug.Log("TicketAccessGate: Player exited, popup closed");
         }
     }
 
-    /// <summary>
-    /// Called when the script is disabled or destroyed
-    /// </summary>
-    void OnDisable()
+    void FindPlayerController()
     {
-        StopAllCoroutines();
-        
-        // Clean up UI state
-        if (EventSystem.current != null)
+        if (playerController == null)
+            playerController = FindObjectOfType<FirstPersonController>();
+    }
+
+    void FindPlayerControllerNow()
+    {
+        playerController = FindObjectOfType<FirstPersonController>();
+    }
+
+    void FindSubmitButton()
+    {
+        if (submitButton == null && popupPanel != null)
+            submitButton = popupPanel.GetComponentInChildren<Button>();
+    }
+
+    void FindJoystick()
+    {
+        joystickToDisable = FindObjectOfType<Joystick>();
+        if (joystickToDisable != null)
         {
-            EventSystem.current.SetSelectedGameObject(null);
+            joystickCanvasGroup = joystickToDisable.GetComponent<CanvasGroup>();
+            if (joystickCanvasGroup == null)
+                joystickCanvasGroup = joystickToDisable.gameObject.AddComponent<CanvasGroup>();
         }
+    }
+
+    void SetPlayerUIState(bool isOpen)
+    {
+        if (playerController != null)
+            playerController.SetUIOpen(isOpen);
         
-        // Re-enable player movement and joystick
-        SetPlayerUIState(false);
-        
-        // Extra safety: always ensure joystick is re-enabled when this script is disabled
-        SetJoystickInteractable(true);
+        if (joystickCanvasGroup != null)
+        {
+            joystickCanvasGroup.interactable = !isOpen;
+            joystickCanvasGroup.blocksRaycasts = !isOpen;
+        }
     }
 }
