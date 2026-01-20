@@ -44,8 +44,9 @@ public class TicketAccessGate : MonoBehaviour
     private Joystick joystickToDisable = null;
     private CanvasGroup joystickCanvasGroup = null;
     
-    // TouchScreenKeyboard for iOS manual keyboard handling
+    // TouchScreenKeyboard for iOS manual keyboard handling - BYPASS TMP_InputField entirely
     private TouchScreenKeyboard mobileKeyboard = null;
+    private bool useDirectKeyboard = false;  // True on iOS/Android to bypass TMP_InputField keyboard
 
     /// <summary>
     /// Called when the script becomes enabled - handles scene transitions
@@ -57,6 +58,9 @@ public class TicketAccessGate : MonoBehaviour
         isProcessingAccess = false;
         lastAccessAttemptTime = 0f;
         inputFieldWasSelected = false;
+        
+        // Clean up any stale keyboard reference
+        mobileKeyboard = null;
         
         // If already initialized (not first run), re-setup critical components
         if (hasInitialized)
@@ -79,6 +83,14 @@ public class TicketAccessGate : MonoBehaviour
             popupPanel.SetActive(false);
         if (feedbackText != null)
             feedbackText.text = "";
+        
+        // Determine if we should use direct keyboard (bypass TMP_InputField on mobile)
+        #if UNITY_IOS || UNITY_ANDROID
+        useDirectKeyboard = true;
+        Debug.Log("TicketAccessGate: Using DIRECT TouchScreenKeyboard (bypassing TMP_InputField)");
+        #else
+        useDirectKeyboard = false;
+        #endif
         
         // Ensure EventSystem exists - CRITICAL for iOS keyboard
         EnsureEventSystemExists();
@@ -386,11 +398,12 @@ public class TicketAccessGate : MonoBehaviour
         codeInputField.contentType = TMP_InputField.ContentType.Alphanumeric;
         codeInputField.keyboardType = TouchScreenKeyboardType.Default;
         
-        // iOS-specific settings
+        // iOS-specific settings - DISABLE TMP_InputField's keyboard handling
         #if UNITY_IOS || UNITY_ANDROID
-        // shouldHideMobileInput = false shows the native input field which works better on iOS
-        codeInputField.shouldHideMobileInput = false;
-        Debug.Log("TicketAccessGate: Configured input field for mobile (shouldHideMobileInput=false)");
+        // We handle the keyboard directly, so prevent TMP_InputField from opening it
+        codeInputField.shouldHideMobileInput = true;  // Hide native overlay since we manage keyboard directly
+        codeInputField.readOnly = false;  // Allow text to be set programmatically
+        Debug.Log("TicketAccessGate: Configured input field for DIRECT keyboard mode");
         #endif
         
         // Make the entire input field touchable
@@ -560,58 +573,60 @@ public class TicketAccessGate : MonoBehaviour
         // Safety check
         if (popupPanel == null) return;
         
-        // Sync text from manually opened TouchScreenKeyboard (iOS)
+        // DIRECT KEYBOARD MODE: Sync text from TouchScreenKeyboard to input field display
         #if UNITY_IOS || UNITY_ANDROID
-        if (mobileKeyboard != null)
+        if (useDirectKeyboard && mobileKeyboard != null)
         {
-            if (mobileKeyboard.status == TouchScreenKeyboard.Status.Visible)
+            // Check keyboard state
+            bool keyboardActive = mobileKeyboard.active;
+            var status = mobileKeyboard.status;
+            
+            // Always sync text while keyboard exists
+            if (codeInputField != null && mobileKeyboard.text != null)
             {
-                // Sync text while typing
-                if (codeInputField != null && codeInputField.text != mobileKeyboard.text)
+                if (codeInputField.text != mobileKeyboard.text)
                 {
                     codeInputField.text = mobileKeyboard.text;
                 }
             }
-            else if (mobileKeyboard.status == TouchScreenKeyboard.Status.Done)
+            
+            // Handle keyboard close events
+            if (!keyboardActive || status == TouchScreenKeyboard.Status.Done)
             {
-                // Keyboard closed with "Done" - submit
+                // Keyboard closed with "Done" button or Return key
+                Debug.Log($"TicketAccessGate: Keyboard closed with Done. Text='{mobileKeyboard.text}'");
                 if (codeInputField != null)
                 {
                     codeInputField.text = mobileKeyboard.text;
                 }
                 mobileKeyboard = null;
-                TryAccess();
+                
+                // Auto-submit when Done is pressed
+                if (status == TouchScreenKeyboard.Status.Done)
+                {
+                    TryAccess();
+                }
             }
-            else if (mobileKeyboard.status == TouchScreenKeyboard.Status.Canceled || 
-                     mobileKeyboard.status == TouchScreenKeyboard.Status.LostFocus)
+            else if (status == TouchScreenKeyboard.Status.Canceled)
             {
-                // Keyboard was dismissed without submitting - reset input field state
-                Debug.Log("TicketAccessGate: Keyboard dismissed externally, resetting input field state");
+                // Keyboard cancelled - keep text but don't submit
+                Debug.Log($"TicketAccessGate: Keyboard cancelled. Text='{mobileKeyboard.text}'");
                 if (codeInputField != null)
                 {
-                    codeInputField.text = mobileKeyboard.text;  // Keep typed text
-                    codeInputField.DeactivateInputField();
-                }
-                if (EventSystem.current != null)
-                {
-                    EventSystem.current.SetSelectedGameObject(null);
+                    codeInputField.text = mobileKeyboard.text;
                 }
                 mobileKeyboard = null;
-                inputFieldWasSelected = false;
             }
-        }
-        
-        // CRITICAL: Detect when iOS keyboard was closed externally (user pressed keyboard dismiss button)
-        // The input field might think it's still focused even though keyboard is gone
-        if (codeInputField != null && codeInputField.isFocused && !TouchScreenKeyboard.visible)
-        {
-            Debug.Log("TicketAccessGate: Input field thinks it's focused but keyboard not visible - resetting");
-            codeInputField.DeactivateInputField();
-            if (EventSystem.current != null)
+            else if (status == TouchScreenKeyboard.Status.LostFocus)
             {
-                EventSystem.current.SetSelectedGameObject(null);
+                // Keyboard lost focus (dismissed by user) - keep text
+                Debug.Log($"TicketAccessGate: Keyboard lost focus. Text='{mobileKeyboard.text}'");
+                if (codeInputField != null)
+                {
+                    codeInputField.text = mobileKeyboard.text;
+                }
+                mobileKeyboard = null;
             }
-            inputFieldWasSelected = false;
         }
         #endif
         
@@ -699,22 +714,8 @@ public class TicketAccessGate : MonoBehaviour
                 // Check if touch is within the input field area
                 if (IsTouchOverInputField(touch.position))
                 {
-                    Debug.Log($"TicketAccessGate: Touch detected on input field. isFocused={codeInputField.isFocused}, keyboardVisible={TouchScreenKeyboard.visible}");
-                    
-                    // CRITICAL: If keyboard is not visible but input thinks it's focused, reset first
-                    #if UNITY_IOS || UNITY_ANDROID
-                    if (codeInputField.isFocused && !TouchScreenKeyboard.visible)
-                    {
-                        Debug.Log("TicketAccessGate: Resetting stuck focus state before activation");
-                        codeInputField.DeactivateInputField();
-                        if (EventSystem.current != null)
-                        {
-                            EventSystem.current.SetSelectedGameObject(null);
-                        }
-                    }
-                    #endif
-                    
-                    ActivateInputFieldSafe();
+                    Debug.Log($"TicketAccessGate: Touch on input field. useDirectKeyboard={useDirectKeyboard}");
+                    OpenKeyboardDirect();
                 }
             }
         }
@@ -723,20 +724,65 @@ public class TicketAccessGate : MonoBehaviour
         {
             if (IsTouchOverInputField(Input.mousePosition))
             {
-                Debug.Log("TicketAccessGate: Mouse click detected on input field");
-                ActivateInputFieldSafe();
+                Debug.Log("TicketAccessGate: Mouse click on input field");
+                OpenKeyboardDirect();
             }
         }
     }
 
     /// <summary>
-    /// Safely activates the input field with proper EventSystem handling for iOS
+    /// Opens the keyboard directly - BYPASSES TMP_InputField on mobile for reliability
+    /// </summary>
+    void OpenKeyboardDirect()
+    {
+        if (codeInputField == null) return;
+        
+        Debug.Log("TicketAccessGate: OpenKeyboardDirect called");
+        
+        #if UNITY_IOS || UNITY_ANDROID
+        if (useDirectKeyboard)
+        {
+            // DIRECT APPROACH: Don't use TMP_InputField's keyboard at all
+            // Just open TouchScreenKeyboard directly every time
+            
+            // Close any existing keyboard first
+            if (mobileKeyboard != null)
+            {
+                mobileKeyboard = null;
+            }
+            
+            // Open keyboard with current text
+            string currentText = codeInputField.text ?? "";
+            Debug.Log($"TicketAccessGate: Opening TouchScreenKeyboard directly with text: '{currentText}'");
+            
+            mobileKeyboard = TouchScreenKeyboard.Open(
+                currentText,
+                TouchScreenKeyboardType.Default,
+                false,  // autocorrection off
+                false,  // multiline off  
+                false,  // secure off
+                false,  // alert off
+                "Enter access code",
+                20      // max length
+            );
+            
+            Debug.Log($"TicketAccessGate: TouchScreenKeyboard opened. Active={mobileKeyboard?.active}, Status={mobileKeyboard?.status}");
+            return;
+        }
+        #endif
+        
+        // Fallback for desktop/editor - use normal activation
+        ActivateInputFieldSafe();
+    }
+
+    /// <summary>
+    /// Safely activates the input field (desktop/editor only, mobile uses OpenKeyboardDirect)
     /// </summary>
     void ActivateInputFieldSafe()
     {
         if (codeInputField == null) return;
         
-        Debug.Log("TicketAccessGate: ActivateInputFieldSafe called");
+        Debug.Log("TicketAccessGate: ActivateInputFieldSafe called (desktop mode)");
         
         // CRITICAL: Ensure EventSystem exists and is working
         EnsureEventSystemExists();

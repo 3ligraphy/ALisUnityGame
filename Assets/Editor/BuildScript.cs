@@ -34,7 +34,7 @@ public class BuildScript
         // Configure company and product names for App Store compliance
         PlayerSettings.companyName = "Failaka Games";
         PlayerSettings.productName = "Failaka Island";
-        PlayerSettings.bundleVersion = "1.0.11";  // 11th submission - FIXED: keyboard not reopening after iOS dismiss button pressed, force reset input field state
+        PlayerSettings.bundleVersion = "1.0.12";  // 12th submission - NEW: Bypass TMP_InputField, use TouchScreenKeyboard directly on iOS
         Debug.Log("✅ Set company: Failaka Games");
         Debug.Log("✅ Set product: Failaka Island");
         Debug.Log("✅ Set version: 1.0.10");
