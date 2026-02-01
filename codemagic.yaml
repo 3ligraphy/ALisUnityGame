@@ -298,6 +298,35 @@ workflows:
             echo "Build Number: ${BUILD_NUM}"
           fi
       
+      - name: Create or Fetch Provisioning Profile
+        script: |
+          echo "=========================================="
+          echo "Creating/Fetching Provisioning Profile..."
+          echo "=========================================="
+          
+          # Use CodeMagic's app-store-connect CLI to fetch or create profile
+          # This uses the App Store Connect API integration
+          
+          # First, try to fetch existing profiles
+          echo "Fetching profiles from App Store Connect..."
+          app-store-connect fetch-signing-files "${BUNDLE_ID}" \
+            --type IOS_APP_STORE \
+            --create \
+            --verbose || {
+              echo "⚠️ Could not fetch/create profile automatically"
+              echo "Trying alternative method..."
+              
+              # Alternative: List available profiles
+              app-store-connect list-profiles --type IOS_APP_STORE || true
+            }
+          
+          # List what we got
+          echo ""
+          echo "Available signing files:"
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles in default location"
+          
+          echo "✅ Provisioning profile step complete"
+      
       - name: Set up code signing settings on Xcode project
         script: |
           echo "=========================================="
