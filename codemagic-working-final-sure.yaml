@@ -42,9 +42,6 @@ workflows:
         
       xcode: latest
       cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.failaka.games.adventure
     
     cache:
       cache_paths:
@@ -297,6 +294,36 @@ workflows:
             echo "Version: 1.0.1"
             echo "Build Number: ${BUILD_NUM}"
           fi
+      
+      - name: Fetch signing files using App Store Connect API
+        script: |
+          echo "=========================================="
+          echo "Fetching/Creating signing files via App Store Connect API..."
+          echo "=========================================="
+          
+          # Use App Store Connect API to automatically fetch or create
+          # certificates and provisioning profiles
+          # The --create flag enables automatic creation of new signing assets if they don't exist
+          app-store-connect fetch-signing-files "${BUNDLE_ID}" \
+            --type IOS_APP_STORE \
+            --create \
+            --verbose
+          
+          echo "✅ Signing files fetched/created via App Store Connect API"
+      
+      - name: Set up keychain for code signing
+        script: |
+          echo "=========================================="
+          echo "Setting up keychain with certificates..."
+          echo "=========================================="
+          
+          # Initialize keychain and add fetched certificates
+          keychain initialize
+          
+          # Add fetched certificates to keychain
+          keychain add-certificates
+          
+          echo "✅ Keychain configured with certificates"
       
       - name: Set up code signing settings on Xcode project
         script: |
