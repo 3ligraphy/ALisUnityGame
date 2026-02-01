@@ -34,7 +34,7 @@ public class BuildScript
         // Configure company and product names for App Store compliance
         PlayerSettings.companyName = "Failaka Games";
         PlayerSettings.productName = "Failaka Island";
-        PlayerSettings.bundleVersion = "1.0.21";  // 21st - Added configuration validation warnings in Start()
+        PlayerSettings.bundleVersion = "1.1.0";  // 21st - Added configuration validation warnings in Start()
         Debug.Log("✅ Set company: Failaka Games");
         Debug.Log("✅ Set product: Failaka Island");
         Debug.Log("✅ Set version: 1.0.10");

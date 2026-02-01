@@ -28,9 +28,6 @@ workflows:
       # This Unity is used ONLY to activate the license
       # The actual project build uses Unity 6000.2.15f1 installed via Unity Hub CLI
       unity: 2022.3.47f1
-      groups:
-        # REQUIRED: Add CERTIFICATE_PRIVATE_KEY to this group in CodeMagic UI
-        - code-signing
       vars:
         # Unity Student account credentials
         # ⚠️ WARNING: These will be visible in your Git repository!
@@ -46,8 +43,9 @@ workflows:
         
       xcode: latest
       cocoapods: default
-      # NOTE: ios_signing section removed to bypass pre-build validation
-      # Signing is handled via groups + integrations + app-store-connect CLI
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.failaka.games.adventure
     
     cache:
       cache_paths:
@@ -297,42 +295,6 @@ workflows:
             echo "Version: 1.1.0"
             echo "Build Number: ${BUILD_NUM}"
           fi
-      
-      - name: Create Signing Files (Certificate + Profile)
-        script: |
-          echo "=========================================="
-          echo "Setting up Code Signing..."
-          echo "=========================================="
-          
-          # Initialize keychain for code signing
-          echo "Setting up keychain..."
-          keychain initialize
-          
-          # Use CodeMagic's app-store-connect CLI to fetch/create signing files
-          # This uses the App Store Connect API integration
-          echo ""
-          echo "Fetching/Creating signing files from App Store Connect..."
-          echo "Bundle ID: ${BUNDLE_ID}"
-          echo ""
-          
-          # Fetch or create certificate and profile
-          app-store-connect fetch-signing-files "${BUNDLE_ID}" \
-            --type IOS_APP_STORE \
-            --create \
-            --verbose
-          
-          # Add certificates to keychain
-          echo ""
-          echo "Adding certificates to keychain..."
-          keychain add-certificates
-          
-          # List what we got
-          echo ""
-          echo "Installed provisioning profiles:"
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles found"
-          
-          echo ""
-          echo "✅ Code signing setup complete"
       
       - name: Set up code signing settings on Xcode project
         script: |
