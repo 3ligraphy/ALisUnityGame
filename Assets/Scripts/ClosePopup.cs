@@ -8,6 +8,13 @@ public class ClosePopup : MonoBehaviour
     public void Close()
     {
         popupUI.SetActive(false);
-        fps.SetUIOpen(false); // رجّع الحركة والكاميرا
+        
+        // Show all icons again
+        InfoIconManager.SetPopupOpen(false);
+        
+        if (fps != null)
+        {
+            fps.SetUIOpen(false);
+        }
     }
 }

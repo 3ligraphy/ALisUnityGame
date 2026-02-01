@@ -1,7 +1,7 @@
 # CodeMagic Configuration for Unity iOS Build
 # This configuration is optimized for Unity Personal (Free) license with Gmail login
 # 
-# ⚠️ SECURITY WARNING: This file contains your Unity credentials directly in the YAML file.
+# ΓÜá∩╕Å SECURITY WARNING: This file contains your Unity credentials directly in the YAML file.
 # This means your password will be visible in your Git repository!
 # 
 # RECOMMENDED: Use environment variables instead (more secure):
@@ -20,7 +20,7 @@ workflows:
   ios-workflow:
     name: iOS Workflow
     max_build_duration: 120
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_m2
     integrations:
       app_store_connect: Code Magic illusionaire  # Uses your CodeMagic Apple Developer integration
     environment:
@@ -30,7 +30,7 @@ workflows:
       unity: 2022.3.47f1
       vars:
         # Unity Student account credentials
-        # ⚠️ WARNING: These will be visible in your Git repository!
+        # ΓÜá∩╕Å WARNING: These will be visible in your Git repository!
         UNITY_EMAIL: "ali.mohamed@alum.bue.edu.eg"  # Your Unity Student account
         UNITY_PASSWORD: "AJ1422003249aj*"      # Your Unity password
         UNITY_SERIAL: "SC-R5R8-3499-EVB4-MBEM-BAE7"  # Your Unity serial number
@@ -74,7 +74,7 @@ workflows:
           echo "UNITY_VERSION_CHANGESET=$UNITY_VERSION_CHANGESET" >> $CM_ENV
           echo "UNITY_HOME=/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity.app" >> $CM_ENV
           
-          echo "✅ Unity version detected: $UNITY_VERSION"
+          echo "Γ£à Unity version detected: $UNITY_VERSION"
       
       - name: Activate Unity License
         script: |
@@ -89,7 +89,7 @@ workflows:
           TEMP_UNITY=$(find /Applications/Unity/Hub/Editor -name Unity -type f -path "*/Unity.app/Contents/MacOS/Unity" 2>/dev/null | head -1)
           
           if [ -z "$TEMP_UNITY" ]; then
-            echo "❌ No Unity installation found for license activation"
+            echo "Γ¥î No Unity installation found for license activation"
             ls -la /Applications/Unity/Hub/Editor/ 2>/dev/null || echo "No Unity Hub Editor directory found"
             exit 1
           fi
@@ -112,9 +112,9 @@ workflows:
           
           # Check if license was activated
           if [ -f "$HOME/Library/Application Support/Unity/Unity_lic.ulf" ]; then
-            echo "✅ Unity license activated successfully"
+            echo "Γ£à Unity license activated successfully"
           else
-            echo "⚠️ License file not found, but continuing..."
+            echo "ΓÜá∩╕Å License file not found, but continuing..."
           fi
       
       - name: Install Unity Version via Unity Hub
@@ -127,7 +127,7 @@ workflows:
           UNITY_PATH="/Applications/Unity/Hub/Editor/${UNITY_VERSION}/Unity.app/Contents/MacOS/Unity"
           
           if [ -f "$UNITY_PATH" ]; then
-            echo "✅ Unity ${UNITY_VERSION} already installed"
+            echo "Γ£à Unity ${UNITY_VERSION} already installed"
           else
             echo "Installing Unity ${UNITY_VERSION} with iOS module only..."
             
@@ -145,15 +145,15 @@ workflows:
               -m ios \
               -a arm64
             
-            echo "✅ Unity ${UNITY_VERSION} installation complete"
+            echo "Γ£à Unity ${UNITY_VERSION} installation complete"
           fi
           
           # Verify installation
           if [ -f "$UNITY_PATH" ]; then
-            echo "✅ Unity verified at: $UNITY_PATH"
+            echo "Γ£à Unity verified at: $UNITY_PATH"
             "$UNITY_PATH" -version || echo "Unity executable found"
           else
-            echo "❌ Unity installation failed"
+            echo "Γ¥î Unity installation failed"
             exit 1
           fi
       
@@ -171,11 +171,11 @@ workflows:
           
           # Verify Unity exists
           if [ ! -f "$UNITY_PATH" ]; then
-            echo "❌ Error: Unity executable not found at: $UNITY_PATH"
+            echo "Γ¥î Error: Unity executable not found at: $UNITY_PATH"
             exit 1
           fi
           
-          echo "✅ Using Unity ${UNITY_VERSION} at: $UNITY_PATH"
+          echo "Γ£à Using Unity ${UNITY_VERSION} at: $UNITY_PATH"
           
           # Set environment variables for build script
           export IOS_BUILD_PATH="$CM_BUILD_DIR/build/ios"
@@ -201,27 +201,111 @@ workflows:
           
           if [ -f "$CM_BUILD_DIR/unity_build.log" ]; then
             if grep -q "Build succeeded" "$CM_BUILD_DIR/unity_build.log"; then
-              echo "✅ Unity build succeeded!"
+              echo "Γ£à Unity build succeeded!"
             elif grep -q "Build failed" "$CM_BUILD_DIR/unity_build.log"; then
-              echo "❌ Unity build failed. Last 50 lines of log:"
+              echo "Γ¥î Unity build failed. Last 50 lines of log:"
               tail -50 "$CM_BUILD_DIR/unity_build.log"
               exit 1
             else
-              echo "⚠️  Build status unclear. Checking for Xcode project..."
+              echo "ΓÜá∩╕Å  Build status unclear. Checking for Xcode project..."
               # Check if Xcode project was created
               if [ -d "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcodeproj" ] || [ -d "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcworkspace" ]; then
-                echo "✅ Xcode project found - build likely succeeded"
+                echo "Γ£à Xcode project found - build likely succeeded"
               ls -la "$CM_BUILD_DIR/build/ios/"
               else
-                echo "❌ Xcode project not found. Last 100 lines of log:"
+                echo "Γ¥î Xcode project not found. Last 100 lines of log:"
                 tail -100 "$CM_BUILD_DIR/unity_build.log"
                 exit 1
               fi
             fi
           else
-            echo "⚠️  Build log not found, but continuing..."
+            echo "ΓÜá∩╕Å  Build log not found, but continuing..."
           fi
       
+      # ============================================
+      # OPTIONAL: SIMULATOR TESTING
+      # Builds for SimulatorSDK, runs on iPad simulator with VNC
+      # ============================================
+      - name: Build Unity for Simulator Testing
+        script: |
+          echo "=========================================="
+          echo "≡ƒº¬ Building Unity for iOS SIMULATOR..."
+          echo "=========================================="
+          
+          UNITY_PATH="$UNITY_HOME/Contents/MacOS/Unity"
+          
+          # Build for Simulator using BuildIOSSimulator method
+          $UNITY_PATH \
+            -quit \
+            -batchmode \
+            -nographics \
+            -projectPath "$CM_BUILD_DIR" \
+            -executeMethod BuildScript.BuildIOSSimulator \
+            -logFile "$CM_BUILD_DIR/simulator_build.log" \
+            || true
+          
+          if [ -d "$CM_BUILD_DIR/build/ios_simulator/Unity-iPhone.xcodeproj" ]; then
+            echo "Γ£à Simulator build succeeded!"
+          else
+            echo "ΓÜá∩╕Å Simulator build failed, skipping simulator test"
+            tail -30 "$CM_BUILD_DIR/simulator_build.log" 2>/dev/null || true
+          fi
+      
+      - name: Run on iOS Simulator (VNC Testing)
+        script: |
+          echo "=========================================="
+          echo "≡ƒº¬ Running on iOS Simulator..."
+          echo "=========================================="
+          
+          SIMULATOR_BUILD="$CM_BUILD_DIR/build/ios_simulator"
+          
+          if [ ! -d "$SIMULATOR_BUILD/Unity-iPhone.xcodeproj" ]; then
+            echo "ΓÜá∩╕Å Skipping simulator test (build not found)"
+            exit 0
+          fi
+          
+          cd "$SIMULATOR_BUILD"
+          
+          # Build Xcode for simulator (no signing)
+          xcodebuild \
+            -project Unity-iPhone.xcodeproj \
+            -scheme Unity-iPhone \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath DerivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            build 2>&1 | tail -20 || true
+          
+          APP_PATH=$(find DerivedData -name "*.app" -type d 2>/dev/null | head -1)
+          
+          if [ -n "$APP_PATH" ]; then
+            echo "Γ£à App: $APP_PATH"
+            
+            IPAD_UDID=$(xcrun simctl list devices available | grep -i "ipad" | grep -oE '\([A-F0-9-]+\)' | head -1 | tr -d '()')
+            
+            if [ -n "$IPAD_UDID" ]; then
+              xcrun simctl boot "$IPAD_UDID" 2>/dev/null || true
+              open -a Simulator
+              sleep 5
+              xcrun simctl install "$IPAD_UDID" "$APP_PATH"
+              xcrun simctl launch "$IPAD_UDID" "${BUNDLE_ID}"
+              
+              echo ""
+              echo "=========================================="
+              echo "≡ƒûÑ∩╕Å  VNC TESTING - 10 min window"
+              echo "=========================================="
+              
+              sleep 600
+              
+              xcrun simctl shutdown "$IPAD_UDID" 2>/dev/null || true
+            fi
+          fi
+          
+          rm -rf "$CM_BUILD_DIR/build/ios_simulator"
+          echo "Continuing with App Store build..."
       - name: Configure Xcode Project
         script: |
           echo "=========================================="
@@ -233,13 +317,13 @@ workflows:
           
           # Verify Xcode project exists
           if [ ! -d "Unity-iPhone.xcodeproj" ] && [ ! -d "Unity-iPhone.xcworkspace" ]; then
-            echo "❌ Error: Xcode project not found!"
+            echo "Γ¥î Error: Xcode project not found!"
             echo "Contents of build/ios directory:"
             ls -la
             exit 1
           fi
           
-          echo "✅ Xcode project found"
+          echo "Γ£à Xcode project found"
           
           # Find Info.plist
           INFO_PLIST=""
@@ -252,7 +336,7 @@ workflows:
           fi
           
           if [ -z "$INFO_PLIST" ] || [ ! -f "$INFO_PLIST" ]; then
-            echo "⚠️  Warning: Info.plist not found, but continuing..."
+            echo "ΓÜá∩╕Å  Warning: Info.plist not found, but continuing..."
           else
             echo "Updating Info.plist: $INFO_PLIST"
             
@@ -263,36 +347,36 @@ workflows:
             # Set bundle identifier
             /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" "$INFO_PLIST" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${BUNDLE_ID}" "$INFO_PLIST" 2>/dev/null || \
-            echo "⚠️  Could not set bundle identifier"
+            echo "ΓÜá∩╕Å  Could not set bundle identifier"
             
-            # Set version (eighth submission - iOS-specific fixes for touch input and EventSystem)
-            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.8" "$INFO_PLIST" 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.8" "$INFO_PLIST" 2>/dev/null || \
+            # Set version (1.1.0 - Major update: improved interactions, quality manager, video fullscreen)
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.1.0" "$INFO_PLIST" 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.1.0" "$INFO_PLIST" 2>/dev/null || \
             echo "⚠️  Could not set version"
             
             # Set build number (MUST exist for App Store Connect)
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUM" "$INFO_PLIST" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUM" "$INFO_PLIST" 2>/dev/null || {
-              echo "❌ ERROR: Failed to set CFBundleVersion!"
+              echo "Γ¥î ERROR: Failed to set CFBundleVersion!"
               exit 1
             }
             
             # Verify CFBundleVersion was set
             VERIFY_BUILD_NUM=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST" 2>/dev/null)
             if [ -z "$VERIFY_BUILD_NUM" ]; then
-              echo "❌ ERROR: CFBundleVersion is still empty after setting!"
+              echo "Γ¥î ERROR: CFBundleVersion is still empty after setting!"
               exit 1
             fi
-            echo "✅ CFBundleVersion set to: $VERIFY_BUILD_NUM"
+            echo "Γ£à CFBundleVersion set to: $VERIFY_BUILD_NUM"
             
             # Set minimum iOS version
             /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 13.0" "$INFO_PLIST" 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string 13.0" "$INFO_PLIST" 2>/dev/null || \
-            echo "⚠️  Could not set minimum iOS version"
+            echo "ΓÜá∩╕Å  Could not set minimum iOS version"
             
-            echo "✅ Info.plist updated"
+            echo "Γ£à Info.plist updated"
             echo "Bundle ID: ${BUNDLE_ID}"
-            echo "Version: 1.0.8"
+            echo "Version: 1.1.0"
             echo "Build Number: ${BUILD_NUM}"
           fi
       
@@ -308,7 +392,7 @@ workflows:
           # This uses CodeMagic's xcode-project tool to automatically configure signing
           xcode-project use-profiles
           
-          echo "✅ Code signing profiles applied to Xcode project"
+          echo "Γ£à Code signing profiles applied to Xcode project"
       
       - name: Fix UnityFramework automatic signing
         script: |
@@ -321,7 +405,7 @@ workflows:
           PROJECT_FILE="Unity-iPhone.xcodeproj/project.pbxproj"
           
           if [ ! -f "$PROJECT_FILE" ]; then
-            echo "❌ Error: project.pbxproj not found"
+            echo "Γ¥î Error: project.pbxproj not found"
             exit 1
           fi
           
@@ -336,7 +420,7 @@ workflows:
             {print}
           ' "$PROJECT_FILE" > "${PROJECT_FILE}.tmp" && mv "${PROJECT_FILE}.tmp" "$PROJECT_FILE"
           
-          echo "✅ UnityFramework set to automatic signing"
+          echo "Γ£à UnityFramework set to automatic signing"
           
       - name: Install CocoaPods Dependencies
         script: |
@@ -349,7 +433,7 @@ workflows:
           # Check if Podfile exists (Unity sometimes creates one)
           if [ -f "Podfile" ]; then
             echo "Podfile found, installing dependencies..."
-            pod install --repo-update || echo "⚠️  CocoaPods installation had issues, but continuing..."
+            pod install --repo-update || echo "ΓÜá∩╕Å  CocoaPods installation had issues, but continuing..."
           else
             echo "No Podfile found - this is normal for most Unity projects"
             echo "Skipping CocoaPods installation"
@@ -368,7 +452,7 @@ workflows:
             --project "$CM_BUILD_DIR/build/ios/Unity-iPhone.xcodeproj" \
             --scheme "Unity-iPhone"
           
-          echo "✅ IPA built successfully"
+          echo "Γ£à IPA built successfully"
       
     artifacts:
       - build/ios/ipa/*.ipa
@@ -396,9 +480,9 @@ workflows:
                 -password "${UNITY_PASSWORD}" \
                 -logFile - || echo "License return attempted"
               
-              echo "✅ Unity license returned"
+              echo "Γ£à Unity license returned"
             else
-              echo "⚠️ Unity not found, skipping license return"
+              echo "ΓÜá∩╕Å Unity not found, skipping license return"
             fi
       email:
         recipients:

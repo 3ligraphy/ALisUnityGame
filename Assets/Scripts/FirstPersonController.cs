@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 using TMPro;
 
 [RequireComponent(typeof(CharacterController))]
@@ -9,7 +10,7 @@ public class FirstPersonController : MonoBehaviour
     [Header("Movement Settings")]
     public float moveSpeed = 5f;
     public float gravity = -9.81f;
-    public float jumpHeight = 1.5f;
+    public float jumpHeight = 4.0f; // Increased jump height
 
     [Header("Touch Look Settings")]
     [Tooltip("Sensitivity for touch-based camera rotation")]
@@ -25,10 +26,20 @@ public class FirstPersonController : MonoBehaviour
     public bool uiOpen = false;
 
     [Header("Touch Zones")]
-    [Tooltip("The left portion of the screen reserved for joystick (0.0-1.0)")]
-    public float joystickZoneWidth = 0.4f;
-    [Tooltip("The bottom portion of screen for joystick (0.0-1.0)")]
-    public float joystickZoneHeight = 0.5f;
+    [Tooltip("The left portion of the screen reserved for joystick (0.0-1.0). Kept narrow so 'i' icons on the left are not captured as joystick.")]
+    public float joystickZoneWidth = 0.22f;
+    [Tooltip("The bottom portion of screen for joystick (0.0-1.0). Kept low so 'i' icons above are not captured.")]
+    public float joystickZoneHeight = 0.35f;
+
+    [Header("Jump Button Settings")]
+    [Tooltip("Size of the jump button in pixels")]
+    public float jumpButtonSize = 80f;
+    [Tooltip("Margin from screen edges in pixels")]
+    public float jumpButtonMargin = 30f;
+    [Tooltip("Color of the jump button")]
+    public Color jumpButtonColor = new Color(0.3f, 0.6f, 0.9f, 0.85f);
+    [Tooltip("Color when jump button is pressed")]
+    public Color jumpButtonPressedColor = new Color(0.5f, 0.8f, 1f, 1f);
 
     private CharacterController controller;
     private Vector3 velocity;
@@ -40,6 +51,11 @@ public class FirstPersonController : MonoBehaviour
     
     // Track if we've been initialized in this scene
     private bool hasInitializedThisScene = false;
+    
+    // Jump button UI
+    private GameObject jumpButtonObj;
+    private Button jumpButton;
+    private bool jumpButtonPressed = false;
 
     void Start()
     {
@@ -57,6 +73,9 @@ public class FirstPersonController : MonoBehaviour
         
         // Find joystick
         FindJoystick();
+        
+        // Create jump button UI
+        CreateJumpButton();
         
         hasInitializedThisScene = true;
         Debug.Log($"FirstPersonController: Started. Forward direction: {transform.forward}");
@@ -135,12 +154,15 @@ public class FirstPersonController : MonoBehaviour
         // Find joystick in new scene
         FindJoystick();
         
+        // Ensure jump button exists
+        EnsureJumpButton();
+        
         // Log player orientation for debugging
         Debug.Log($"FirstPersonController: After scene load - Forward: {transform.forward}, Rotation: {transform.rotation.eulerAngles}");
     }
 
     /// <summary>
-    /// Finds the joystick in the scene. Called on Start and when joystick reference is invalid.
+    /// Finds the joystick in the scene and shrinks its click area so 'i' icons on the left are not captured.
     /// </summary>
     void FindJoystick()
     {
@@ -148,10 +170,243 @@ public class FirstPersonController : MonoBehaviour
         if (joystick != null)
         {
             Debug.Log("FirstPersonController: Found VariableJoystick");
+            ShrinkJoystickClickArea();
         }
         else
         {
             Debug.LogWarning("FirstPersonController: No VariableJoystick found in scene!");
+        }
+    }
+    
+    /// <summary>
+    /// Shrinks the joystick's root RectTransform so its click area matches our zone (bottom-left only).
+    /// Prevents the joystick from capturing touches meant for 'i' icons on the left side.
+    /// </summary>
+    void ShrinkJoystickClickArea()
+    {
+        if (joystick == null) return;
+        
+        RectTransform joystickRoot = joystick.GetComponent<RectTransform>();
+        if (joystickRoot == null) return;
+        
+        // Anchor to bottom-left and size to exactly our zone (0-1 in anchor space)
+        joystickRoot.anchorMin = new Vector2(0, 0);
+        joystickRoot.anchorMax = new Vector2(joystickZoneWidth, joystickZoneHeight);
+        joystickRoot.pivot = new Vector2(0, 0);
+        joystickRoot.anchoredPosition = Vector2.zero;
+        joystickRoot.sizeDelta = Vector2.zero;
+        
+        Debug.Log($"FirstPersonController: Joystick click area set to {joystickZoneWidth * 100}% width x {joystickZoneHeight * 100}% height");
+    }
+
+    /// <summary>
+    /// Creates a jump button on the right side of the screen for mobile/touch devices.
+    /// Uses a dedicated overlay canvas so the button always appears in bottom-right.
+    /// </summary>
+    void CreateJumpButton()
+    {
+        // If we have a valid button already, just ensure it's visible
+        if (jumpButtonObj != null)
+        {
+            if (!jumpButtonObj.activeInHierarchy)
+            {
+                jumpButtonObj.SetActive(true);
+            }
+            return;
+        }
+        
+        // Always use a dedicated canvas for the jump button (not the scene canvas)
+        // so it persists and stays in correct screen position
+        GameObject canvasObj = GameObject.Find("FirstPersonJumpButtonCanvas");
+        if (canvasObj == null)
+        {
+            canvasObj = new GameObject("FirstPersonJumpButtonCanvas");
+            Canvas canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 500; // On top of most UI
+            CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080, 1920);
+            scaler.matchWidthOrHeight = 0.5f;
+            scaler.referencePixelsPerUnit = 100;
+            canvasObj.AddComponent<GraphicRaycaster>();
+            DontDestroyOnLoad(canvasObj);
+        }
+        
+        Transform canvasTransform = canvasObj.transform;
+        
+        // Check if there's already a JumpButton (e.g. from previous scene load)
+        Transform existingButton = canvasTransform.Find("JumpButton");
+        if (existingButton != null)
+        {
+            jumpButtonObj = existingButton.gameObject;
+            jumpButtonObj.SetActive(true);
+            jumpButton = jumpButtonObj.GetComponent<Button>();
+            SetupJumpButtonEvents();
+            EnsureJumpButtonPosition();
+            return;
+        }
+        
+        // Create the jump button
+        jumpButtonObj = new GameObject("JumpButton");
+        jumpButtonObj.transform.SetParent(canvasTransform, false);
+        
+        // Set up RectTransform - bottom right corner (works with overlay)
+        RectTransform buttonRect = jumpButtonObj.AddComponent<RectTransform>();
+        buttonRect.anchorMin = new Vector2(1, 0);  // Bottom-right anchor
+        buttonRect.anchorMax = new Vector2(1, 0);
+        buttonRect.pivot = new Vector2(1, 0);
+        buttonRect.sizeDelta = new Vector2(jumpButtonSize, jumpButtonSize);
+        buttonRect.anchoredPosition = new Vector2(-jumpButtonMargin, jumpButtonMargin);
+        
+        // Add background image (circular look)
+        Image buttonImage = jumpButtonObj.AddComponent<Image>();
+        buttonImage.color = jumpButtonColor;
+        
+        // Add Button component
+        jumpButton = jumpButtonObj.AddComponent<Button>();
+        ColorBlock colors = jumpButton.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.1f, 1.1f, 1.1f, 1f);
+        colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+        jumpButton.colors = colors;
+        
+        // Create arrow icon (upward arrow using text)
+        GameObject iconObj = new GameObject("JumpIcon");
+        iconObj.transform.SetParent(jumpButtonObj.transform, false);
+        
+        RectTransform iconRect = iconObj.AddComponent<RectTransform>();
+        iconRect.anchorMin = Vector2.zero;
+        iconRect.anchorMax = Vector2.one;
+        iconRect.offsetMin = Vector2.zero;
+        iconRect.offsetMax = Vector2.zero;
+        
+        TMP_Text iconText = iconObj.AddComponent<TextMeshProUGUI>();
+        iconText.text = "↑";  // Upward arrow symbol
+        iconText.fontSize = 36;
+        iconText.fontStyle = FontStyles.Bold;
+        iconText.color = Color.white;
+        iconText.alignment = TextAlignmentOptions.Center;
+        
+        // Add small label below the arrow
+        GameObject labelObj = new GameObject("JumpLabel");
+        labelObj.transform.SetParent(jumpButtonObj.transform, false);
+        
+        RectTransform labelRect = labelObj.AddComponent<RectTransform>();
+        labelRect.anchorMin = new Vector2(0, 0);
+        labelRect.anchorMax = new Vector2(1, 0.35f);
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+        
+        TMP_Text labelText = labelObj.AddComponent<TextMeshProUGUI>();
+        labelText.text = "JUMP";
+        labelText.fontSize = 12;
+        labelText.fontStyle = FontStyles.Bold;
+        labelText.color = Color.white;
+        labelText.alignment = TextAlignmentOptions.Center;
+        
+        // Setup button events
+        SetupJumpButtonEvents();
+        
+        Debug.Log("FirstPersonController: Jump button created (bottom-right)");
+    }
+    
+    /// <summary>
+    /// Ensures jump button is in the correct bottom-right position (handles canvas scale).
+    /// </summary>
+    void EnsureJumpButtonPosition()
+    {
+        if (jumpButtonObj == null) return;
+        
+        RectTransform rect = jumpButtonObj.GetComponent<RectTransform>();
+        if (rect == null) return;
+        
+        rect.anchorMin = new Vector2(1, 0);
+        rect.anchorMax = new Vector2(1, 0);
+        rect.pivot = new Vector2(1, 0);
+        rect.sizeDelta = new Vector2(jumpButtonSize, jumpButtonSize);
+        rect.anchoredPosition = new Vector2(-jumpButtonMargin, jumpButtonMargin);
+    }
+    
+    /// <summary>
+    /// Sets up the event listeners for the jump button (press and release)
+    /// </summary>
+    void SetupJumpButtonEvents()
+    {
+        if (jumpButton == null) return;
+        
+        // Remove any existing listeners
+        jumpButton.onClick.RemoveAllListeners();
+        
+        // Add EventTrigger for press/release detection
+        EventTrigger trigger = jumpButtonObj.GetComponent<EventTrigger>();
+        if (trigger == null)
+        {
+            trigger = jumpButtonObj.AddComponent<EventTrigger>();
+        }
+        trigger.triggers.Clear();
+        
+        // Pointer Down - start jump
+        EventTrigger.Entry pointerDown = new EventTrigger.Entry();
+        pointerDown.eventID = EventTriggerType.PointerDown;
+        pointerDown.callback.AddListener((data) => { OnJumpButtonDown(); });
+        trigger.triggers.Add(pointerDown);
+        
+        // Pointer Up - end jump press
+        EventTrigger.Entry pointerUp = new EventTrigger.Entry();
+        pointerUp.eventID = EventTriggerType.PointerUp;
+        pointerUp.callback.AddListener((data) => { OnJumpButtonUp(); });
+        trigger.triggers.Add(pointerUp);
+    }
+    
+    /// <summary>
+    /// Called when jump button is pressed
+    /// </summary>
+    void OnJumpButtonDown()
+    {
+        jumpButtonPressed = true;
+        
+        // Visual feedback - change button color
+        if (jumpButtonObj != null)
+        {
+            Image img = jumpButtonObj.GetComponent<Image>();
+            if (img != null) img.color = jumpButtonPressedColor;
+        }
+    }
+    
+    /// <summary>
+    /// Called when jump button is released
+    /// </summary>
+    void OnJumpButtonUp()
+    {
+        jumpButtonPressed = false;
+        
+        // Reset button color
+        if (jumpButtonObj != null)
+        {
+            Image img = jumpButtonObj.GetComponent<Image>();
+            if (img != null) img.color = jumpButtonColor;
+        }
+    }
+    
+    /// <summary>
+    /// Ensures the jump button exists and is visible after scene transitions.
+    /// </summary>
+    void EnsureJumpButton()
+    {
+        // Recreate if destroyed (e.g. scene unload) or never created
+        if (jumpButtonObj == null)
+        {
+            CreateJumpButton();
+        }
+        else if (!jumpButtonObj.activeInHierarchy)
+        {
+            jumpButtonObj.SetActive(true);
+            EnsureJumpButtonPosition();
+        }
+        else
+        {
+            EnsureJumpButtonPosition();
         }
     }
 
@@ -389,9 +644,15 @@ public class FirstPersonController : MonoBehaviour
 
     void HandleJump()
     {
-        if (Input.GetButtonDown("Jump") && controller.isGrounded)
+        // Check for keyboard jump OR touch button jump
+        bool shouldJump = Input.GetButtonDown("Jump") || jumpButtonPressed;
+        
+        if (shouldJump && controller.isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            
+            // Reset button state after jump (prevents continuous jumping while held)
+            jumpButtonPressed = false;
         }
     }
 

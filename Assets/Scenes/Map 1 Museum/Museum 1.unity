@@ -2254,6 +2254,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &123469695
 MeshFilter:
@@ -2277,7 +2278,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CubeClickHandler
   popupPanel: {fileID: 436875109}
   closeButton: {fileID: 1694398911}
-  maxInteractionDistance: 3
+  clickRadius: 2
 --- !u!1 &128773599
 GameObject:
   m_ObjectHideFlags: 0
@@ -2314,10 +2315,17 @@ MonoBehaviour:
   moveSpeed: 10
   gravity: -9.81
   jumpHeight: 1
+  touchSensitivity: 0.15
   mouseSensitivity: 2
   playerCamera: {fileID: 406481324}
   joystick: {fileID: 66430037}
   uiOpen: 0
+  joystickZoneWidth: 0.22
+  joystickZoneHeight: 0.35
+  jumpButtonSize: 80
+  jumpButtonMargin: 30
+  jumpButtonColor: {r: 0.3, g: 0.6, b: 0.9, a: 0.85}
+  jumpButtonPressedColor: {r: 0.5, g: 0.8, b: 1, a: 1}
 --- !u!143 &128773601
 CharacterController:
   m_ObjectHideFlags: 0
@@ -2413,6 +2421,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &128773604
 MeshFilter:
@@ -2492,14 +2501,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 131700589}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.25
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -2793,7 +2802,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CubeClickHandler
   popupPanel: {fileID: 1647501170}
   closeButton: {fileID: 378227363}
-  maxInteractionDistance: 3
+  clickRadius: 2
 --- !u!23 &157623827
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -2841,6 +2850,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &157623828
 MeshFilter:
@@ -3247,14 +3257,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 207159143}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.25
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -4040,6 +4050,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &265959276
 MeshFilter:
@@ -4063,7 +4074,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CubeClickHandler
   popupPanel: {fileID: 1660152216}
   closeButton: {fileID: 1656964176}
-  maxInteractionDistance: 3
+  clickRadius: 2
 --- !u!1001 &272598006
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4530,8 +4541,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uFE94\uFEF3\uFEAE\uFE9B\uFEF7\u0627 \uFE94\uFEF4\uFE8B\uFE8E\uFEE8\uFE92\uFEDF\u0627
-    \u0631\uFE8E\uFEA0\uFEA3\uFEF7"
+  m_Text: 
 --- !u!114 &310913899
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6021,14 +6031,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 428340459}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.25
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -6899,12 +6909,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uFEAE\uFEA0\uFEA4\uFEDF\u0627 \u0629\u062F\uFE8E\uFEE3 \uFEE6\uFEE3 \uFE94\uFECB\uFEEE\uFEE8\uFEBC\uFEE4\uFEDF\u0627\u0648
-    \u060C\u0629\u0631\u062F\uFE8E\uFEE8\uFEDF\u0627 \uFE94\uFEE4\uFEF3\uFEAE\uFEDC\uFEDF\u0627
-    \u0631\uFE8E\uFEA0\uFEA3\uFEF7\u0627 \uFEAA\uFEA3\u0623 \uFEEE\uFEEB\n.\uFEAA\uFEF3\uFEAA\uFEA4\uFEDF\u0627
-    \uFEF0\uFEE0\uFECB \uFEEA\uFE8B\u0627\uFEEE\uFE98\uFEA3\uFEFB \u0627\uFEAE\uFEC8\uFEE7
-    \u064A\u062F\uFE8E\uFEE3\uFEAE\uFEDF\u0627 \uFEEA\uFEE7\uFEEE\uFEE0\uFE91 \uFEB0\uFEF4\uFEE4\uFE98\uFEF3\u0648
-    \u060C\uFEF2\uFEDB\uFEB0\uFEF4\uFEE8\uFEDF\u0627"
+  m_Text: 
 --- !u!114 &504679387
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6917,13 +6922,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 696ce2cd40d49484ab618bf74d31d4ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArabicText
-  Text: "\u0647\u0648 \u0623\u062D\u062F \u0627\u0644\u0623\u062D\u062C\u0627\u0631
-    \u0627\u0644\u0643\u0631\u064A\u0645\u0629 \u0627\u0644\u0646\u0627\u062F\u0631\u0629\u060C
-    \u0648\u0627\u0644\u0645\u0635\u0646\u0648\u0639\u0629 \u0645\u0646 \u0645\u0627\u062F\u0629
-    \u0627\u0644\u062D\u062C\u0631 \u0627\u0644\u0646\u064A\u0632\u0643\u064A\u060C
-    \u0648\u064A\u062A\u0645\u064A\u0632 \u0628\u0644\u0648\u0646\u0647 \u0627\u0644\u0631\u0645\u0627\u062F\u064A
-    \u0646\u0638\u0631\u0627\u064B \u0644\u0627\u062D\u062A\u0648\u0627\u0626\u0647
-    \u0639\u0644\u0649 \u0627\u0644\u062D\u062F\u064A\u062F."
+  Text: "\u0646\u0648\u0639 \u0634\u0647\u064A\u0631 \u0645\u0646 \u0627\u0644\u0643\u0648\u0627\u0631\u062A\u064A\u0632
+    \u064A\u0633\u062A\u062E\u062F\u0645 \u0641\u064A \u0627\u0644\u0645\u062C\u0648\u0647\u0631\u0627\u062A "
   RefrenceInput: {fileID: 0}
   ShowTashkeel: 0
   UseHinduNumbers: 0
@@ -7786,14 +7786,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 566298006}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.25
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -8441,6 +8441,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &586912562
 MeshFilter:
@@ -8464,7 +8465,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CubeClickHandler
   popupPanel: {fileID: 974992826}
   closeButton: {fileID: 1149316978}
-  maxInteractionDistance: 3
+  clickRadius: 2
 --- !u!1001 &588139514
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10258,7 +10259,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CubeClickHandler
   popupPanel: {fileID: 835060577}
   closeButton: {fileID: 1156259188}
-  maxInteractionDistance: 3
+  clickRadius: 2
 --- !u!23 &759469627
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -10306,6 +10307,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &759469628
 MeshFilter:
@@ -10732,7 +10734,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CubeClickHandler
   popupPanel: {fileID: 112184188}
   closeButton: {fileID: 1466833905}
-  maxInteractionDistance: 3
+  clickRadius: 2
 --- !u!23 &794615582
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -10780,6 +10782,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &794615583
 MeshFilter:
@@ -13005,6 +13008,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &962184493
 MeshFilter:
@@ -13028,7 +13032,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CubeClickHandler
   popupPanel: {fileID: 1612443815}
   closeButton: {fileID: 2025002866}
-  maxInteractionDistance: 3
+  clickRadius: 2
 --- !u!1001 &964099816
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -13330,14 +13334,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 972133010}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.25
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -15057,14 +15061,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1127295957}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.25
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -15489,14 +15493,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1141091743}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 15.43
   m_Range: 22.9
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -17368,14 +17372,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1300003776}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.25
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -20353,14 +20357,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1502866992}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.25
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -21689,14 +21693,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1590222530}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 2
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 0.25
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1
@@ -22578,10 +22582,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uFE94\uFEF4\uFEE7\u0648\uFEAE\uFE98\uFEDC\uFEDF\uFEF9\u0627 \u0629\uFEB0\uFEEC\uFE9F\uFEF7\u0627
-    \uFE94\uFECB\uFE8E\uFEE8\uFEBB \uFEF2\uFED3 \u0645\uFEAA\uFEA8\uFE98\uFEB4\uFEF3
-    \u0629\u0631\u062F\uFE8E\uFEE8\uFEDF\u0627 \u0631\uFE8E\uFEA0\uFEA3\uFEF7\u0627
-    \uFEAA\uFEA3\u0623 \uFEEE\uFEEB"
+  m_Text: 
 --- !u!114 &1642386407
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -22594,10 +22595,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 696ce2cd40d49484ab618bf74d31d4ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArabicText
-  Text: "\u0647\u0648 \u0623\u062D\u062F \u0627\u0644\u0623\u062D\u062C\u0627\u0631
-    \u0627\u0644\u0646\u0627\u062F\u0631\u0629 \u064A\u0633\u062A\u062E\u062F\u0645
-    \u0641\u064A \u0635\u0646\u0627\u0639\u0629 \u0627\u0644\u0623\u062C\u0647\u0632\u0629
-    \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629"
+  Text: "\u062D\u062C\u0631 \u0627\u0644\u0639\u0642\u064A\u0642 \u0647\u0648 \u062D\u062C\u0631
+    \u0643\u0631\u064A\u0645, \u0648 \u064A\u062A\u0645\u064A\u0632 \u0628\u0644\u0648\u0646\u0647
+    \u0627\u0644\u0627\u062D\u0645\u0631 \u0627\u0644\u0628\u0646\u064A, \u0648 \u0642\u062F
+    \u0627\u0633\u062A\u062E\u062F\u0645 \u0641\u064A \u0635\u0646\u0627\u0639\u0629
+    \u0627\u0644\u062D\u0644\u064A \u0648 \u0627\u0644\u0645\u062C\u0648\u0647\u0631\u0627\u062A
+    \u0645\u0646\u0630 \u0627\u0644\u0642\u062F\u0645."
   RefrenceInput: {fileID: 0}
   ShowTashkeel: 0
   UseHinduNumbers: 0
@@ -23002,7 +23005,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CubeClickHandler
   popupPanel: {fileID: 1686978259}
   closeButton: {fileID: 184135855}
-  maxInteractionDistance: 3
+  clickRadius: 2
 --- !u!23 &1663293656
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -23050,6 +23053,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &1663293657
 MeshFilter:
@@ -23650,6 +23654,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &1680623551
 MeshFilter:
@@ -24372,7 +24377,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uFE90\uFEF3\uFEAE\uFED0\uFEDF\u0627 \uFEAE\uFEA0\uFEA4\uFEDF\u0627"
+  m_Text: 
 --- !u!114 &1712135523
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -24385,7 +24390,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 696ce2cd40d49484ab618bf74d31d4ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArabicText
-  Text: "\u0627\u0644\u062D\u062C\u0631 \u0627\u0644\u063A\u0631\u064A\u0628"
+  Text: "\u0627\u0644\u062C\u0634\u0645\u062A \u0627\u0644\u0628\u0646\u0641\u0633\u062C\u064A"
   RefrenceInput: {fileID: 0}
   ShowTashkeel: 0
   UseHinduNumbers: 0
@@ -24449,6 +24454,7 @@ MonoBehaviour:
   exhibitNameText: {fileID: 1735012293}
   exhibitInfoText: {fileID: 393889392}
   exhibitImage: {fileID: 1852466920}
+  closeButton: {fileID: 0}
 --- !u!1 &1735012291
 GameObject:
   m_ObjectHideFlags: 0
@@ -26966,7 +26972,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CubeClickHandler
   popupPanel: {fileID: 1198225432}
   closeButton: {fileID: 1959268901}
-  maxInteractionDistance: 3
+  clickRadius: 2
 --- !u!23 &1880582114
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -27014,6 +27020,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!33 &1880582115
 MeshFilter:
@@ -28121,7 +28128,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uFEF2\uFEE7\uFEEE\uFEDC\uFEF4\uFEE0\uFEB4\uFEDF\u0627 \uFEAE\uFEA0\uFEA4\uFEDF\u0627"
+  m_Text: 
 --- !u!114 &1983938039
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -28134,7 +28141,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 696ce2cd40d49484ab618bf74d31d4ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArabicText
-  Text: "\u0627\u0644\u062D\u062C\u0631 \u0627\u0644\u0633\u0644\u064A\u0643\u0648\u0646\u064A"
+  Text: "\u0627\u0644\u0639\u0642\u064A\u0642 \u0627\u0644\u0623\u062D\u0645\u0631"
   RefrenceInput: {fileID: 0}
   ShowTashkeel: 0
   UseHinduNumbers: 0
@@ -29833,14 +29840,14 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2129461231}
   m_Enabled: 1
-  serializedVersion: 11
+  serializedVersion: 12
   m_Type: 1
   m_Color: {r: 0.6167675, g: 0.72051334, b: 0.87169814, a: 1}
   m_Intensity: 0.01
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize2D: {x: 10, y: 10}
   m_Shadows:
     m_Type: 0
     m_Resolution: -1

@@ -107,7 +107,65 @@ public class TicketAccessGate : MonoBehaviour
         CreateKeypadWithDisplay();
         
         hasInitialized = true;
+        
+        // Validation warnings to catch configuration issues
+        ValidateConfiguration();
+        
         Debug.Log("TicketAccessGate: Initialized");
+    }
+    
+    void ValidateConfiguration()
+    {
+        // Check scene index
+        if (targetSceneIndex < 0 || targetSceneIndex >= SceneManager.sceneCountInBuildSettings)
+        {
+            Debug.LogError($"TicketAccessGate: WARNING - targetSceneIndex ({targetSceneIndex}) is invalid! " +
+                          $"Valid range: 0 to {SceneManager.sceneCountInBuildSettings - 1}. " +
+                          "Scene will NOT load on correct code!");
+        }
+        
+        // Check gate blocker (optional but warn if missing)
+        if (gateBlocker == null)
+        {
+            Debug.LogWarning("TicketAccessGate: gateBlocker is not assigned. Gate will still work but nothing will be disabled.");
+        }
+        
+        // Check popup panel
+        if (popupPanel == null)
+        {
+            Debug.LogError("TicketAccessGate: ERROR - popupPanel is not assigned! Gate will not show any UI.");
+        }
+        
+        // Check input field
+        if (codeInputField == null)
+        {
+            Debug.LogError("TicketAccessGate: ERROR - codeInputField is not assigned! Cannot enter codes.");
+        }
+        
+        // Check submit button
+        if (submitButton == null)
+        {
+            Debug.LogWarning("TicketAccessGate: submitButton not assigned. Will try to find it automatically.");
+        }
+        
+        // Check if this object has a collider set as trigger
+        Collider col = GetComponent<Collider>();
+        if (col == null)
+        {
+            Debug.LogError("TicketAccessGate: ERROR - No Collider found! OnTriggerEnter will never be called.");
+        }
+        else if (!col.isTrigger)
+        {
+            Debug.LogError("TicketAccessGate: ERROR - Collider is not set as Trigger! OnTriggerEnter will never be called.");
+        }
+        
+        // Check if Player exists with correct tag
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player == null)
+        {
+            Debug.LogWarning("TicketAccessGate: No GameObject with 'Player' tag found in scene. " +
+                           "Make sure player has the 'Player' tag for trigger to work.");
+        }
     }
     
     void FixPopupSize()
@@ -282,8 +340,8 @@ public class TicketAccessGate : MonoBehaviour
         textRect.offsetMax = Vector2.zero;
         
         TMP_Text btnText = textObj.AddComponent<TextMeshProUGUI>();
-        btnText.text = "123";
-        btnText.fontSize = 14;
+        btnText.text = "Numpad";
+        btnText.fontSize = 11;
         btnText.fontStyle = FontStyles.Bold;
         btnText.color = Color.white;
         btnText.alignment = TextAlignmentOptions.Center;

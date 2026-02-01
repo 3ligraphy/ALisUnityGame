@@ -1,90 +1,165 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
+/// <summary>
+/// Handles interaction with clickable objects (like wells).
+/// Click directly on the object from any distance to open popup.
+/// </summary>
 public class CubeClickHandler : MonoBehaviour
 {
-    // المتغيرات العامة
-    public GameObject popupPanel; // نافذة UI التي تحتوي على الصورة والزر
-    public Button closeButton;    // زر الإغلاق
-    public float maxInteractionDistance = 3.0f; // أقصى مسافة للضغط على المكعب
+    [Header("UI References")]
+    public GameObject popupPanel; // The popup UI panel
+    public Button closeButton;    // Close button
+    
+    [Header("Click Detection")]
+    [Tooltip("Radius of the click detection sphere - larger = easier to click")]
+    public float clickRadius = 2.0f;
 
-    // متغير خاص لتخزين مرجع للاعب
-    private Transform playerTransform;
+    // Private references
+    private FirstPersonController playerController;
+    private Camera mainCamera;
+    private bool isPopupOpen = false;
 
     void Start()
     {
-        // 1. البحث عن اللاعب وتخزين مرجعه في البداية
+        // Find player for SetUIOpen when popup opens
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)
         {
-            playerTransform = player.transform;
+            playerController = player.GetComponent<FirstPersonController>();
         }
-        else
+
+        // Setup close button
+        if (closeButton != null)
         {
-            Debug.LogError("Player GameObject not found! Make sure your Player has the tag 'Player'.");
+            closeButton.onClick.RemoveAllListeners();
+            closeButton.onClick.AddListener(HidePopup);
         }
 
-        // 2. تأكد أن الزر مربوط بوظيفة الإغلاق
-        closeButton.onClick.AddListener(HidePopup);
-
-        // 3. تأكد أن البوب أب مغلق في البداية
-        popupPanel.SetActive(false);
+        // Ensure popup is hidden initially
+        if (popupPanel != null)
+        {
+            popupPanel.SetActive(false);
+        }
+        
+        // Ensure this object has a collider for raycasting
+        if (GetComponent<Collider>() == null)
+        {
+            // Add a box collider if none exists
+            gameObject.AddComponent<BoxCollider>();
+        }
+        
+        // Ensure EventSystem exists for UI clicks
+        EnsureEventSystem();
     }
-
-    // تُستدعى عند الضغط على المكعب بالماوس
-    void OnMouseDown()
+    
+    void EnsureEventSystem()
     {
-        // **الشرط الأول: منع الفتح إذا كان هناك بوب أب آخر مفتوح بالفعل**
-        // نتحقق من حالته قبل أي شيء.
-        if (popupPanel.activeInHierarchy)
+        if (FindObjectOfType<EventSystem>() == null)
         {
-            // إذا كان البوب أب الخاص بهذا المكعب مفتوحاً، نتجاهل الضغطة.
-            return;
+            GameObject esObj = new GameObject("EventSystem");
+            esObj.AddComponent<EventSystem>();
+            esObj.AddComponent<StandaloneInputModule>();
         }
+    }
 
-        // **الشرط الثاني: التحقق من المسافة**
-        if (playerTransform != null)
+    void Update()
+    {
+        // Skip if popup is open or clicking on UI
+        if (isPopupOpen) return;
+        
+        // Check for click/tap
+        if (Input.GetMouseButtonDown(0))
         {
-            float distance = Vector3.Distance(transform.position, playerTransform.position);
-
-            if (distance <= maxInteractionDistance)
+            // Don't process if clicking on UI
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                return;
+            
+            CheckForClick();
+        }
+        
+        // Also check for touch on mobile
+        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
+        {
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId))
+                return;
+                
+            CheckForClick();
+        }
+    }
+    
+    void CheckForClick()
+    {
+        if (mainCamera == null)
+        {
+            mainCamera = Camera.main;
+            if (mainCamera == null) return;
+        }
+        
+        Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+        RaycastHit hit;
+        
+        // Use SphereCast for larger click area (easier to click)
+        if (Physics.SphereCast(ray, clickRadius, out hit, Mathf.Infinity))
+        {
+            // Check if we hit this object or any of its children
+            if (hit.transform == transform || hit.transform.IsChildOf(transform))
             {
-                // إذا كانت المسافة ضمن الحد المسموح به، نفعل البوب أب
                 ShowPopup();
-
-                // **التحكم في التفاعل مع المكعبات الأخرى (إغلاق كل المكعبات الأخرى)**
-                // يجب أن تكون هناك آلية لتعطيل تفاعل المكعبات الأخرى.
-                // أفضل طريقة هي استخدام مدير (Manager) في المشهد (Scene)
-                // يخبر المكعبات الأخرى بعدم السماح بالضغط.
-                // لتبسيط الأمر هنا، سنفترض أننا نستخدم مدير يتحقق من وجود بوب أب مفتوح.
-                
-                // للحصول على المنع الشامل لجميع المكعبات الأخرى:
-                // يجب تطبيق آلية إيقاف التفاعل العام (مثل متغير ثابت أو خدمة في Manager).
-                // في هذا الكود، سنركز على الشروط المحلية (المسافة ومنع إعادة الفتح لنفس المكعب)
-                // وافتراض أنك ستستخدم مدير للتحكم في حالة الفتح العامة.
-                
-                // **ملاحظة:** لتحقيق منع الضغط على أي كيوب آخر، يجب عليك إضافة
-                // شرط في بداية OnMouseDown يتحقق من متغير ثابت/عام في Scene Manager
-                // يشير إلى ما إذا كان هناك "Popup" مفتوح حالياً.
+                return;
             }
-            else
+        }
+        
+        // Also try regular raycast as backup for close objects
+        if (Physics.Raycast(ray, out hit, Mathf.Infinity))
+        {
+            if (hit.transform == transform || hit.transform.IsChildOf(transform))
             {
-                Debug.Log("Too far from the cube! Distance: " + distance + ". Required: " + maxInteractionDistance);
+                ShowPopup();
             }
         }
     }
 
+    /// <summary>
+    /// Shows the popup and notifies player controller
+    /// </summary>
     void ShowPopup()
     {
-        popupPanel.SetActive(true);
-        // **هنا يجب استدعاء دالة في Manager لتسجيل أن هناك بوب أب مفتوح الآن**
-        // ManagerScript.Instance.IsPopupOpen = true; 
+        if (popupPanel != null)
+        {
+            popupPanel.SetActive(true);
+        }
+        
+        isPopupOpen = true;
+        
+        // Show cursor for UI interaction
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        
+        // Notify player controller that UI is open
+        if (playerController != null)
+        {
+            playerController.SetUIOpen(true);
+        }
     }
 
+    /// <summary>
+    /// Hides the popup and notifies player controller
+    /// </summary>
     void HidePopup()
     {
-        popupPanel.SetActive(false);
-        // **هنا يجب استدعاء دالة في Manager لتسجيل أن البوب أب أغلق**
-        // ManagerScript.Instance.IsPopupOpen = false; 
+        if (popupPanel != null)
+        {
+            popupPanel.SetActive(false);
+        }
+        
+        isPopupOpen = false;
+        
+        // Notify player controller that UI is closed
+        if (playerController != null)
+        {
+            playerController.SetUIOpen(false);
+        }
     }
 }
