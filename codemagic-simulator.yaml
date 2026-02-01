@@ -28,9 +28,6 @@ workflows:
       # This Unity is used ONLY to activate the license
       # The actual project build uses Unity 6000.2.15f1 installed via Unity Hub CLI
       unity: 2022.3.47f1
-      groups:
-        # REQUIRED: Add CERTIFICATE_PRIVATE_KEY to this group in CodeMagic UI
-        - code-signing
       vars:
         # Unity Student account credentials
         # ⚠️ WARNING: These will be visible in your Git repository!
@@ -41,13 +38,14 @@ workflows:
         # Bundle identifier - already configured for your app
         BUNDLE_ID: "com.failaka.games.adventure"
         
-        # App Store Connect App ID (optional - for automatic TestFlight uploads)
-        # APP_STORE_ID: ""  # Add this later if you want automatic uploads
-        
       xcode: latest
       cocoapods: default
-      # NOTE: ios_signing section removed to bypass pre-build validation
-      # Signing is handled via groups + integrations + app-store-connect CLI
+      ios_signing:
+        # Reference names from CodeMagic Code Signing Identities
+        provisioning_profiles:
+          - Failaka Provisioning
+        certificates:
+          - dist certt  # Update this to match your certificate reference name in CodeMagic
     
     cache:
       cache_paths:
@@ -382,54 +380,25 @@ workflows:
             echo "Build Number: ${BUILD_NUM}"
           fi
       
-      - name: Create Signing Files (Certificate + Profile)
+      - name: Set up code signing settings on Xcode project
         script: |
           echo "=========================================="
           echo "Setting up Code Signing..."
           echo "=========================================="
           
-          # Initialize keychain for code signing
-          echo "Setting up keychain..."
-          keychain initialize
+          # Certificate and provisioning profile are automatically fetched
+          # by CodeMagic from the ios_signing section
           
-          # Use CodeMagic's app-store-connect CLI to fetch/create signing files
-          # This uses the App Store Connect API integration
-          echo ""
-          echo "Fetching/Creating signing files from App Store Connect..."
-          echo "Bundle ID: ${BUNDLE_ID}"
-          echo ""
+          cd "$CM_BUILD_DIR/build/ios"
           
-          # Fetch or create certificate and profile
-          app-store-connect fetch-signing-files "${BUNDLE_ID}" \
-            --type IOS_APP_STORE \
-            --create \
-            --verbose
+          # Apply the provisioning profiles to the Xcode project
+          xcode-project use-profiles
           
-          # Add certificates to keychain
-          echo ""
-          echo "Adding certificates to keychain..."
-          keychain add-certificates
-          
-          # List what we got
           echo ""
           echo "Installed provisioning profiles:"
           ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles found"
           
           echo ""
-          echo "✅ Code signing setup complete"
-      
-      - name: Set up code signing settings on Xcode project
-        script: |
-          echo "=========================================="
-          echo "Applying provisioning profiles to Xcode..."
-          echo "=========================================="
-          
-          cd "$CM_BUILD_DIR/build/ios"
-          
-          # Apply the fetched provisioning profiles to the Xcode project
-          # This uses CodeMagic's xcode-project tool to automatically configure signing
-          xcode-project use-profiles
-          
           echo "✅ Code signing profiles applied to Xcode project"
       
       - name: Fix UnityFramework automatic signing
