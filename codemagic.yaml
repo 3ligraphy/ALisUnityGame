@@ -28,6 +28,9 @@ workflows:
       # This Unity is used ONLY to activate the license
       # The actual project build uses Unity 6000.2.15f1 installed via Unity Hub CLI
       unity: 2022.3.47f1
+      groups:
+        # REQUIRED: Add CERTIFICATE_PRIVATE_KEY to this group in CodeMagic UI
+        - code-signing
       vars:
         # Unity Student account credentials
         # ⚠️ WARNING: These will be visible in your Git repository!
@@ -44,7 +47,7 @@ workflows:
       xcode: latest
       cocoapods: default
       # NOTE: ios_signing section removed to bypass pre-build validation
-      # Signing is handled manually in scripts using app-store-connect CLI
+      # Signing is handled via groups + integrations + app-store-connect CLI
     
     cache:
       cache_paths:
