@@ -28,6 +28,11 @@ workflows:
       # This Unity is used ONLY to activate the license
       # The actual project build uses Unity 6000.2.15f1 installed via Unity Hub CLI
       unity: 2022.3.47f1
+      # Reference the code-signing group that contains CERTIFICATE_PRIVATE_KEY
+      # This is required for app-store-connect fetch-signing-files --create to work
+      # Set up in CodeMagic dashboard: Teams > Your Team > Global variables & secrets
+      groups:
+        - code-signing  # Must contain CERTIFICATE_PRIVATE_KEY
       vars:
         # Unity Student account credentials
         # ⚠️ WARNING: These will be visible in your Git repository!
@@ -43,9 +48,6 @@ workflows:
         
       xcode: latest
       cocoapods: default
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.failaka.games.adventure
     
     cache:
       cache_paths:
@@ -295,6 +297,55 @@ workflows:
             echo "Version: 1.1.0"
             echo "Build Number: ${BUILD_NUM}"
           fi
+      
+      - name: Fetch signing files using App Store Connect API
+        script: |
+          echo "=========================================="
+          echo "Fetching/Creating signing files via App Store Connect API..."
+          echo "=========================================="
+          
+          # Check if CERTIFICATE_PRIVATE_KEY is available
+          if [ -z "${CERTIFICATE_PRIVATE_KEY:-}" ]; then
+            echo "⚠️  WARNING: CERTIFICATE_PRIVATE_KEY not found in environment!"
+            echo ""
+            echo "To create new certificates, you need to set up CERTIFICATE_PRIVATE_KEY:"
+            echo "1. Go to CodeMagic dashboard → Teams → Your Team → Global variables & secrets"
+            echo "2. Create a group called 'code-signing'"
+            echo "3. Add a variable named 'CERTIFICATE_PRIVATE_KEY' with your private key"
+            echo ""
+            echo "To generate a private key, run on your Mac:"
+            echo "  ssh-keygen -t rsa -b 2048 -m PEM -f cert_key -q -N ''"
+            echo "  cat cert_key  # Copy this as CERTIFICATE_PRIVATE_KEY"
+            echo ""
+            echo "Attempting to fetch existing certificates without creating new ones..."
+          else
+            echo "✅ CERTIFICATE_PRIVATE_KEY found, can create new certificates if needed"
+          fi
+          
+          # Use App Store Connect API to automatically fetch or create
+          # certificates and provisioning profiles
+          # The --create flag enables automatic creation of new signing assets if they don't exist
+          # CERTIFICATE_PRIVATE_KEY must be set in environment for --create to work
+          app-store-connect fetch-signing-files "${BUNDLE_ID}" \
+            --type IOS_APP_STORE \
+            --create \
+            --verbose
+          
+          echo "✅ Signing files fetched/created via App Store Connect API"
+      
+      - name: Set up keychain for code signing
+        script: |
+          echo "=========================================="
+          echo "Setting up keychain with certificates..."
+          echo "=========================================="
+          
+          # Initialize keychain and add fetched certificates
+          keychain initialize
+          
+          # Add fetched certificates to keychain
+          keychain add-certificates
+          
+          echo "✅ Keychain configured with certificates"
       
       - name: Set up code signing settings on Xcode project
         script: |
