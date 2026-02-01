@@ -43,11 +43,8 @@ workflows:
         
       xcode: latest
       cocoapods: default
-      ios_signing:
-        # Use App Store Connect API integration for automatic signing
-        # This automatically fetches/creates certificates and profiles
-        distribution_type: app_store
-        bundle_identifier: com.failaka.games.adventure
+      # NOTE: ios_signing section removed to bypass pre-build validation
+      # Signing is handled manually in scripts using app-store-connect CLI
     
     cache:
       cache_paths:
@@ -382,34 +379,41 @@ workflows:
             echo "Build Number: ${BUILD_NUM}"
           fi
       
-      - name: Create or Fetch Provisioning Profile
+      - name: Create Signing Files (Certificate + Profile)
         script: |
           echo "=========================================="
-          echo "Creating/Fetching Provisioning Profile..."
+          echo "Setting up Code Signing..."
           echo "=========================================="
           
-          # Use CodeMagic's app-store-connect CLI to fetch or create profile
-          # This uses the App Store Connect API integration
+          # Initialize keychain for code signing
+          echo "Setting up keychain..."
+          keychain initialize
           
-          # First, try to fetch existing profiles
-          echo "Fetching profiles from App Store Connect..."
+          # Use CodeMagic's app-store-connect CLI to fetch/create signing files
+          # This uses the App Store Connect API integration
+          echo ""
+          echo "Fetching/Creating signing files from App Store Connect..."
+          echo "Bundle ID: ${BUNDLE_ID}"
+          echo ""
+          
+          # Fetch or create certificate and profile
           app-store-connect fetch-signing-files "${BUNDLE_ID}" \
             --type IOS_APP_STORE \
             --create \
-            --verbose || {
-              echo "⚠️ Could not fetch/create profile automatically"
-              echo "Trying alternative method..."
-              
-              # Alternative: List available profiles
-              app-store-connect list-profiles --type IOS_APP_STORE || true
-            }
+            --verbose
+          
+          # Add certificates to keychain
+          echo ""
+          echo "Adding certificates to keychain..."
+          keychain add-certificates
           
           # List what we got
           echo ""
-          echo "Available signing files:"
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles in default location"
+          echo "Installed provisioning profiles:"
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles found"
           
-          echo "✅ Provisioning profile step complete"
+          echo ""
+          echo "✅ Code signing setup complete"
       
       - name: Set up code signing settings on Xcode project
         script: |
