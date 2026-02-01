@@ -44,8 +44,12 @@ workflows:
       xcode: latest
       cocoapods: default
       ios_signing:
+        # Use App Store Connect API integration for automatic signing
+        # This automatically fetches/creates certificates and profiles
         distribution_type: app_store
         bundle_identifier: com.failaka.games.adventure
+        # Enable automatic certificate and profile management via API
+        certificate_type: IOS_DISTRIBUTION
     
     cache:
       cache_paths:

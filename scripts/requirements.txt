@@ -1,0 +1,4 @@
+# Requirements for Apple Developer API scripts
+PyJWT>=2.0.0
+cryptography>=3.0.0
+requests>=2.25.0
