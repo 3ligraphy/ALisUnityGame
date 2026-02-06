@@ -1,0 +1,46 @@
+================================================================================
+FAILAKA ISLAND — APP STORE CONNECT COPY (Version 1.2.0)
+================================================================================
+
+--------------------------------------------------------------------------------
+WHAT'S NEW (paste into "What's New in This Version")
+--------------------------------------------------------------------------------
+
+• Smoother performance — Optimized for a wider range of devices; less lag when moving through the museum and other scenes.
+• Double-tap to explore — Open exhibit and object info with a double-tap so accidental taps don’t interrupt your visit.
+• Cinema fullscreen — In the Cinema, double-tap the video screen to watch in fullscreen; use the minimize button to return.
+• Quality and stability — Improved handling of graphics and effects for a more stable experience.
+
+--------------------------------------------------------------------------------
+SHORT WHAT'S NEW (if character limit)
+--------------------------------------------------------------------------------
+
+Smoother performance, double-tap exhibit interactions, cinema fullscreen video, and quality improvements across the app.
+
+--------------------------------------------------------------------------------
+REVIEWER NOTES (paste into "Notes for Review" / App Review Information)
+--------------------------------------------------------------------------------
+
+App: Failaka Island | Version: 1.2.0 | Developer: Failaka Games
+
+No login or account required. The app can be tested immediately after launch.
+
+How to test:
+1. Launch the app and use the on-screen joystick (or touch) to move.
+2. Enter scenes (Museum, Wells, Gemstones, Cinema) via the map or gates.
+3. Double-tap on exhibit objects (e.g. in the Museum or Gemstones) to open the info popup. Tap close or outside to dismiss.
+4. In the Cinema scene, double-tap the video screen to enter fullscreen. Use the minimize button (on-screen) to exit fullscreen.
+
+Technical:
+• No custom encryption (HTTPS only). Export compliance: ITSAppUsesNonExemptEncryption = false.
+• Educational/cultural content about Failaka Island (Kuwait). No user-generated content, no social features, no in-app purchases.
+
+Contact: Use the contact details in the developer account for any review questions.
+
+--------------------------------------------------------------------------------
+REVIEWER NOTES — PLAIN TEXT (one paragraph)
+--------------------------------------------------------------------------------
+
+Failaka Island v1.2.0 — No login required. Launch the app and use on-screen controls to move. Double-tap exhibits and objects to open info popups; in the Cinema, double-tap the video for fullscreen and use the minimize button to exit. No custom encryption (HTTPS only). Educational content about Failaka Island; no UGC, social, or IAP. Contact via developer account if needed.
+
+================================================================================
