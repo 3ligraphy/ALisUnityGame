@@ -20,6 +20,8 @@ public class VideoFullscreenController : MonoBehaviour
     [Header("Click Detection")]
     [Tooltip("Radius of the click detection sphere - larger = easier to click")]
     public float clickRadius = 2.0f;
+    [Tooltip("Max time between two taps to count as double-tap (reduces accidental fullscreen on touch)")]
+    public float doubleTapMaxDelay = 0.4f;
     
     [Header("Fullscreen UI Settings")]
     [Tooltip("Background color for fullscreen mode")]
@@ -39,6 +41,8 @@ public class VideoFullscreenController : MonoBehaviour
     // References
     private Camera mainCamera;
     private FirstPersonController playerController;
+    private float lastTapTime = -999f;
+    private Transform lastTappedTransform = null;
     
     void Start()
     {
@@ -123,27 +127,27 @@ public class VideoFullscreenController : MonoBehaviour
             mainCamera = Camera.main;
             if (mainCamera == null) return;
         }
-        
-        Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        RaycastHit hit;
-        
-        // Use SphereCast for larger click area
-        if (Physics.SphereCast(ray, clickRadius, out hit, Mathf.Infinity))
+
+        Transform hitTransform = InteractionHitCache.GetHitTransformForTap(mainCamera, clickRadius);
+        bool hitThis = hitTransform != null && (hitTransform == transform || hitTransform.IsChildOf(transform));
+
+        if (hitThis)
         {
-            if (hit.transform == transform || hit.transform.IsChildOf(transform))
+            if (lastTappedTransform == transform && (Time.time - lastTapTime) <= doubleTapMaxDelay)
             {
+                lastTapTime = -999f;
+                lastTappedTransform = null;
                 EnterFullscreen();
-                return;
+            }
+            else
+            {
+                lastTapTime = Time.time;
+                lastTappedTransform = transform;
             }
         }
-        
-        // Backup regular raycast
-        if (Physics.Raycast(ray, out hit, Mathf.Infinity))
+        else
         {
-            if (hit.transform == transform || hit.transform.IsChildOf(transform))
-            {
-                EnterFullscreen();
-            }
+            lastTappedTransform = null;
         }
     }
     

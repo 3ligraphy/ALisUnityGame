@@ -14,10 +14,14 @@ public class CubeInteraction : MonoBehaviour
     [Header("Click Detection")]
     [Tooltip("Radius of the click detection sphere - larger = easier to click")]
     public float clickRadius = 2.0f;
+    [Tooltip("Max time between two taps to count as double-tap (reduces accidental opens on touch)")]
+    public float doubleTapMaxDelay = 0.4f;
 
     private FirstPersonController playerController;
     private Camera mainCamera;
     private bool isPopupOpen = false;
+    private float lastTapTime = -999f;
+    private Transform lastTappedTransform = null;
 
     void Start()
     {
@@ -93,28 +97,27 @@ public class CubeInteraction : MonoBehaviour
             mainCamera = Camera.main;
             if (mainCamera == null) return;
         }
-        
-        Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        RaycastHit hit;
-        
-        // Use SphereCast for larger click area (easier to click)
-        if (Physics.SphereCast(ray, clickRadius, out hit, Mathf.Infinity))
+
+        Transform hitTransform = InteractionHitCache.GetHitTransformForTap(mainCamera, clickRadius);
+        bool hitThis = hitTransform != null && (hitTransform == transform || hitTransform.IsChildOf(transform));
+
+        if (hitThis)
         {
-            // Check if we hit this object or any of its children
-            if (hit.transform == transform || hit.transform.IsChildOf(transform))
+            if (lastTappedTransform == transform && (Time.time - lastTapTime) <= doubleTapMaxDelay)
             {
+                lastTapTime = -999f;
+                lastTappedTransform = null;
                 ShowPopup();
-                return;
+            }
+            else
+            {
+                lastTapTime = Time.time;
+                lastTappedTransform = transform;
             }
         }
-        
-        // Also try regular raycast as backup for close objects
-        if (Physics.Raycast(ray, out hit, Mathf.Infinity))
+        else
         {
-            if (hit.transform == transform || hit.transform.IsChildOf(transform))
-            {
-                ShowPopup();
-            }
+            lastTappedTransform = null;
         }
     }
 
