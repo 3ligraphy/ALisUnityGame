@@ -45,6 +45,9 @@ public class QualityManager : MonoBehaviour
     [Header("Water/Effects Settings")]
     [Tooltip("Reduce water quality (affects Suimono and similar systems)")]
     public bool reduceWaterQuality = true;
+    [Tooltip("Sea/water sound volume. Applied at runtime so build matches. 0=mute, 1=full")]
+    [Range(0f, 1f)]
+    public float seaVolume = 0f;
     [Tooltip("Reduce particle effects")]
     public bool reduceParticles = true;
     [Tooltip("Particle budget multiplier (0.5 = half particles)")]
@@ -274,6 +277,8 @@ public class QualityManager : MonoBehaviour
                 TrySetProperty(obj, "waveScale", 0.5f);
                 TrySetProperty(obj, "enableFoam", false);
                 TrySetProperty(obj, "enableUnderwaterFX", false);
+                // Force sea/water sound volume (so build matches; scene may have maxVolume=1)
+                TrySetProperty(obj, "maxVolume", seaVolume);
                 
                 Debug.Log($"QualityManager: Reduced quality for {obj.GetType().Name}");
             }
@@ -286,6 +291,9 @@ public class QualityManager : MonoBehaviour
             probe.resolution = 64;
             probe.intensity = 0.5f;
         }
+        
+        // Apply sea volume to Suimono AudioSources immediately (so build respects it from frame 1)
+        ApplySeaVolumeOnly();
         
         Debug.Log($"QualityManager: Reduced {reflectionProbes.Length} reflection probes");
     }
@@ -363,10 +371,39 @@ public class QualityManager : MonoBehaviour
         {
             ReduceWaterQuality();
         }
+        else if (seaVolume < 1f)
+        {
+            // Still apply sea volume so build matches (e.g. cinema scene)
+            ApplySeaVolumeOnly();
+        }
         
         if (reduceParticles)
         {
             ReduceParticleEffects();
+        }
+    }
+    
+    /// <summary>
+    /// Only set Suimono sea/water sound volume (used when reduceWaterQuality is off but seaVolume &lt; 1).
+    /// Also applies immediately to any AudioSources on the module so the build respects it.
+    /// </summary>
+    void ApplySeaVolumeOnly()
+    {
+        var all = FindObjectsOfType<MonoBehaviour>();
+        foreach (var obj in all)
+        {
+            if (obj.GetType().Name.Equals("SuimonoModule", System.StringComparison.OrdinalIgnoreCase))
+            {
+                TrySetProperty(obj, "maxVolume", seaVolume);
+                // Apply to existing AudioSources so change is immediate in build
+                var sources = obj.GetComponentsInChildren<AudioSource>();
+                foreach (var src in sources)
+                {
+                    src.volume = Mathf.Min(src.volume, seaVolume);
+                }
+                Debug.Log($"QualityManager: Set sea volume to {seaVolume} on SuimonoModule ({sources.Length} AudioSources)");
+                break;
+            }
         }
     }
     

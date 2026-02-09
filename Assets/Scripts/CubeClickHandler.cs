@@ -70,27 +70,25 @@ public class CubeClickHandler : MonoBehaviour
 
     void Update()
     {
-        // Skip if popup is open or clicking on UI
         if (isPopupOpen) return;
-        
-        // Check for click/tap
-        if (Input.GetMouseButtonDown(0))
+
+        bool isTouch = Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began;
+        bool isMouse = Input.GetMouseButtonDown(0);
+
+        if (Application.isMobilePlatform || Input.touchCount > 0)
         {
-            // Don't process if clicking on UI
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
-                return;
-            
-            CheckForClick();
-        }
-        
-        // Also check for touch on mobile
-        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
-        {
+            if (!isTouch) return;
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId))
                 return;
-                
-            CheckForClick();
         }
+        else
+        {
+            if (!isMouse) return;
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                return;
+        }
+
+        CheckForClick();
     }
     
     void CheckForClick()
